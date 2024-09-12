@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Service pour le prétraitement et l'entraînement avec la bibliothèque Surprise
+  # preprocessing:
+  #   build:
+  #     context: ./preprocessing
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./preprocessing:/app
+  #   depends_on:
+  #     - mongodb
+
+  # Service pour MongoDB
+  # mongodb:
+  #   image: mongo:latest
+  #   volumes:
+  #     - mongodb_data:/data/db
+  #   ports:
+  #     - "27017:27017"
+
+  # Service pour le scraping
+  # scraper:
+  #   build:
+  #     context: ./scraping
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./scraping:/app
+  #   depends_on:
+  #     - mongodb
+
+  # Service pour FastAPI
+  fastapi:
+    build:
+      context: ./fastapi
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./fastapi:/app
+    ports:
+      - "8000:8000"
+    # depends_on:
+    #   - mongodb
+    # Service pour Streamlit
+    # streamlit:
+    #   build:
+    #     context: ./streamlit
+    #     dockerfile: Dockerfile
+    #   volumes:
+    #     - ./streamlit:/app
+    #   ports:
+    #     - "8501:8501"
+    #   depends_on:
+    #     - fastapi
+
+    # Service pour Airflow
+    # airflow:
+    #   image: apache/airflow:2.3.0
+    #   environment:
+    #     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    #     - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////root/airflow.db
+    #   volumes:
+    #     - ./airflow/dags:/opt/airflow/dags
+    #   ports:
+    #     - "8080:8080"
+
+    # Service pour Prometheus
+    # prometheus:
+    #   image: prom/prometheus:latest
+    #   volumes:
+    #     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    #   ports:
+    #     - "9090:9090"
+
+    # Service pour Grafana
+    # grafana:
+    #   image: grafana/grafana:latest
+    #   ports:
+    #     - "3000:3000"
+
+    # volumes:
+    #   mongodb_data:
