@@ -1,0 +1,7 @@
+streamlit
+fastapi
+numpy
+pillow
+python-multipart
+uvicorn
+streamlit-jwt-authenticator

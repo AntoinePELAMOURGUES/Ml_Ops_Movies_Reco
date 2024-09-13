@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#4440661"  # Remplacez par la couleur désirée
+backgroundColor = "#220331"  # Couleur de fond principale
+secondaryBackgroundColor = "#2b043d"  # Couleur de fond secondaire
+textColor = "#FFFFFF"  # Couleur du texte
+font = "monospace"

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Service pour le prétraitement et l'entraînement avec la bibliothèque Surprise
   # preprocessing:
@@ -40,20 +38,26 @@ services:
       - ./fastapi:/app
     ports:
       - "8000:8000"
+    restart: always
+    networks:
+      - app
     # depends_on:
     #   - mongodb
-    # Service pour Streamlit
-    # streamlit:
-    #   build:
-    #     context: ./streamlit
-    #     dockerfile: Dockerfile
-    #   volumes:
-    #     - ./streamlit:/app
-    #   ports:
-    #     - "8501:8501"
-    #   depends_on:
-    #     - fastapi
 
+    container_name: fastapi
+    # Service pour Streamlit
+  streamlit:
+    build:
+      context: ./streamlit
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    restart: always
+    networks:
+      - app
+    depends_on:
+      - fastapi
+    container_name: streamlit
     # Service pour Airflow
     # airflow:
     #   image: apache/airflow:2.3.0
@@ -81,3 +85,6 @@ services:
 
     # volumes:
     #   mongodb_data:
+networks:
+  app:
+    driver: bridge

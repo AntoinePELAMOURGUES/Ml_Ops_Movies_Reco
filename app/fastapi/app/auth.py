@@ -48,12 +48,10 @@ def get_db():
     finally:
         db.close()  # Ferme la session à la fin
 
-# Dépendance pour la base de données
-db_dependency = Annotated[Session, Depends(get_db)]
 
 # Route pour créer un nouvel utilisateur
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_user(db: db_dependency, create_user_request: CreateUserRequest):
+async def create_user(db: Annotated[Session, Depends(get_db)], create_user_request: CreateUserRequest):
     # Vérifiez si l'utilisateur existe déjà
     existing_user = db.query(User).filter(User.username == create_user_request.username).first()
     if existing_user:
@@ -72,7 +70,7 @@ async def create_user(db: db_dependency, create_user_request: CreateUserRequest)
 
 # Route pour obtenir un token d'accès
 @router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):
+async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: Annotated[Session, Depends(get_db)]):
     user = authenticate_user(form_data.username, form_data.password, db)  # Authentifie l'utilisateur
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Could not validate user.')  # Erreur si l'authentification échoue
