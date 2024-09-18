@@ -61,7 +61,7 @@ elif page == pages[3]:
 
           if submitted:
                if username and password:
-                    response = requests.post("http://localhost:8000/auth/", json= {"username":username, "password": password})
+                    response = requests.post("http://fastapi:8000/auth/", json= {"username":username, "password": password})
                     result = response.json()
 
                     if response.status_code == 201:  # Utilisateur créé avec succès
@@ -86,7 +86,7 @@ elif page == pages[3]:
 
           if submitted:
                if username and password:
-                    response = requests.post("http://localhost:8000/auth/token", data= {"username":username, "password": password})
+                    response = requests.post("http://fastapi:8000/auth/token", data= {"username":username, "password": password})
 
                     if response.status_code == 200:  # Utilisateur coonecté
                          st.success(f"Connexion réussie ! Bienvenue {username}. Vous pouvez maintenant poursuivre sur les prochaines pages.")
@@ -100,13 +100,35 @@ elif page == pages[3]:
 
 # Vérifiez si l'utilisateur est connecté avant d'afficher les pages 4 et 5
 if st.session_state.is_logged_in:
-    # Afficher le contenu des pages 4 et 5 ici
-    if page == pages[4]:
-        st.header("Page 4")
-        # Contenu de la page 4
+     # Afficher le contenu des pages 4 et 5 ici
+     if page == pages[4]:
 
-    elif page == pages[5]:
-        st.header("Page 5")
-        # Contenu de la page 5
+          st.header("Bienvenue sur notre site de recommandation de films")
+
+          logo = "netflix-catalogue.jpg"
+
+          # Affichage de l'image en haut de la page
+          st.image(logo)
+
+          st.write("Choisissez un numéro d'utilisateur compris entre 1 et 138493")
+
+          # Create a form
+          form = st.form("Infos_utilisateur")
+
+          with form:
+               user_id = form.text_input("Numéro utilisateur")
+               submitted = form.form_submit_button("Envoyer")
+
+          if submitted:
+               req = requests.post("http://fastapi:8000/predict/", data={'userId' : user_id})
+
+               resultat = req.json()
+
+               for i in resultat:
+                    st.write(i)
+
+     elif page == pages[5]:
+          st.header("Page 5")
+          # Contenu de la page 5
 
 

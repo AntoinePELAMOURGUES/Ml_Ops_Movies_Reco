@@ -6,6 +6,7 @@ from .database import engine, SessionLocal
 from .models import *  # Importation de tous les modèles
 from .models import Base  # Importation de la base pour créer les tables
 from .auth import get_current_user, router  # Importation des fonctions d'authentification et du routeur
+from .predict import * # Importation des fonctions de predictions
 
 # Création de l'application FastAPI
 app = FastAPI()
