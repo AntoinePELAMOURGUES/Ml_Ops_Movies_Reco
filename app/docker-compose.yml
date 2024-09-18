@@ -10,12 +10,16 @@ services:
   #     - mongodb
 
   # Service pour MongoDB
-  # mongodb:
-  #   image: mongo:latest
-  #   volumes:
-  #     - mongodb_data:/data/db
-  #   ports:
-  #     - "27017:27017"
+  mongodb:
+    image: mongo:latest
+    volumes:
+      - ./mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: antoine
+      MONGO_INITDB_ROOT_PASSWORD: pela
+    container_name: mongodb
 
   # Service pour le scraping
   # scraper:
@@ -41,9 +45,8 @@ services:
     restart: always
     networks:
       - app
-    # depends_on:
-    #   - mongodb
-
+    depends_on:
+      - mongodb
     container_name: fastapi
     # Service pour Streamlit
   streamlit:
@@ -83,8 +86,6 @@ services:
     #   ports:
     #     - "3000:3000"
 
-    # volumes:
-    #   mongodb_data:
 networks:
   app:
     driver: bridge

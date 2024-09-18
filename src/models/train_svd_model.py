@@ -124,8 +124,8 @@ if __name__ == "__main__":
     # Création de la matrice utilisateur
     df = create_user_matrix(ratings, movies)
     # # Cross_validation
-    # model = cross_validation_model(df, model = SVD())
+    model = cross_validation_model(df, model = SVD())
     # # Entrainenement du modèle
     model = train_model(df)
     # Sauvegarde du modèle
-    save_model(model, '/home/antoine/Ml_Ops_Movies_Reco/models/model_SVD_1.pkl')
+    save_model(model, '/home/antoine/Ml_Ops_Movies_Reco/models/model_SVD.pkl')
