@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 
 # Setup web page
 st.set_page_config(
-     page_title="API de Recommndation de films",
+     page_title="API de Recommandation de films",
     #  page_icon=APP_ICON_URL,
      layout="wide",
 )
@@ -116,16 +116,27 @@ if st.session_state.is_logged_in:
           form = st.form("Infos_utilisateur")
 
           with form:
-               user_id = form.text_input("Numéro utilisateur")
+               user_id_input = form.text_input("Numéro utilisateur")
                submitted = form.form_submit_button("Envoyer")
 
           if submitted:
-               req = requests.post("http://fastapi:8000/predict/", data={'userId' : user_id})
+               # Vérification que user_id est un entier et dans la plage spécifiée
+               try:
+                    user_id = int(user_id_input)  # Convertir en entier
+                    if user_id < 1 or user_id > 138493:
+                         st.error("Le numéro d'utilisateur doit être compris entre 1 et 138493.")
+                    else:
+                         # Si la validation passe, envoyer la requête à l'API
+                         req = requests.post("http://fastapi:8000/predict/", data={'userId': user_id})
+                         result = req.json()
 
-               resultat = req.json()
+                         # Affichage des résultats sous forme de liste numérotée
+                         st.write("Voici les recommandations de films :")
 
-               for i in resultat:
-                    st.write(i)
+                         for index, title in result.items():
+                              st.markdown(f"{index}. {title}")
+               except ValueError:
+                    st.error("Veuillez entrer un numéro d'utilisateur valide (un entier).")
 
      elif page == pages[5]:
           st.header("Page 5")

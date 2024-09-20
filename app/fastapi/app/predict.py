@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 from surprise import Reader, Dataset, accuracy, SVD
 from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
-from fastapi import Request, UploadFile, APIRouter
+from fastapi import Request, UploadFile, APIRouter, HTTPException
 from typing import List, Dict, Any
 
 # Création d'un routeur pour gérer les routes de prédiction
@@ -122,17 +122,21 @@ async def predict(request: Request) -> Dict[str, Any]:
 
     # Récupération des données Streamlit
     try:
+        # Récupération des données du formulaire
         request_data = await request.form()
-        print({'request_data': request_data})
+        print({'request_data' : request_data})
+        user_id = int(request_data.get('userId'))  # Récupérer et convertir en entier
     except ValueError:
-        request_data = None
-
-    user_id = int(request_data['userId'])  # Convertir en entier
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+    except KeyError:
+        raise HTTPException(status_code=400, detail="User ID not found in the request")
 
     recommendations = get_top_n_recommendations(user_id)
+
 
     top_n_movies_titles = movies[movies['movieId'].isin(recommendations)]['title'].tolist()
 
     result = {str(i): title for i, title in enumerate(top_n_movies_titles, 1)}
+    print({'result' : result})
 
     return result
