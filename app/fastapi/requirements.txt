@@ -4,3 +4,12 @@ python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 sqlalchemy
+scikit-surprise
+numpy<2.0
+scikit-learn
+pandas
+prometheus-client
+prometheus-fastapi-instrumentator
+requests
+Pillow
+matplotlib

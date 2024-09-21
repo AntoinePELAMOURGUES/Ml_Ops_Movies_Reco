@@ -5,13 +5,22 @@ from sqlalchemy.orm import Session
 from .database import engine, SessionLocal
 from .models import *  # Importation de tous les modèles
 from .models import Base  # Importation de la base pour créer les tables
-from .auth import get_current_user, router  # Importation des fonctions d'authentification et du routeur
+from .auth import get_current_user, router as auth_router # Importation des fonctions d'authentification et du routeur
+from .predict import router as predict_router # Importation des fonctions de predictions
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Création de l'application FastAPI
 app = FastAPI()
 
+# Créez un instrumentateur et configurez-le
+instrumentator = Instrumentator()
+
+# Instrumenter l'application et exposer les métriques
+instrumentator.instrument(app).expose(app)
+
 # Inclusion du routeur d'authentification
-app.include_router(router)
+app.include_router(auth_router)
+app.include_router(predict_router)
 
 # Création des tables dans la base de données
 Base.metadata.create_all(bind=engine)
