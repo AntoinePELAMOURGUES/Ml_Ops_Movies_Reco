@@ -1,12 +1,13 @@
 import streamlit as st
 import requests
-import os
-import streamlit.components.v1 as components
+
 
 # Setup web page
 st.set_page_config(
-     page_title="API de Recommandation de films",
-    #  page_icon=APP_ICON_URL,
+
+     page_title="API de Recommndation de films",
+     #  page_icon=APP_ICON_URL,
+
      layout="wide",
 )
 
@@ -55,24 +56,31 @@ elif page == pages[3]:
      # Formulaire d'inscription
      with st.form("registration_form"):
           st.header("Inscription")
+          st.write("Règles de sécurité:")
+          st.markdown("""
+                      - Le nom d'utilisateur ne doit contenir que des lettres, chiffres et underscores.
+                      - Le mot de passe doit contenir au moins 12 caractères, un chiffre, une majuscule et un cartère spécial.
+                      """)
           username = st.text_input("Nom d'utilisateur")
           password = st.text_input("Mot de passe", type="password")
           submitted = st.form_submit_button("S'inscrire")
 
           if submitted:
-               if username and password:
-                    response = requests.post("http://fastapi:8000/auth/", json= {"username":username, "password": password})
-                    result = response.json()
+            
+               # Convertir le nom d'utilisateur en minuscules avant l'envoi
+               normalized_username = username.lower()
 
-                    if response.status_code == 201:  # Utilisateur créé avec succès
-                         st.success(f"Inscription réussie ! Bienvenue {username}. Vous pouvez maintenant vous connecter.")
-                         st.balloons()
-                    elif response.status_code == 400:  # Erreur d'utilisateur déjà enregistré
-                         st.error("Nom d'utilisateur déjà enregistré. Veuillez choisir un autre identifiant")
-                    else:  # Autres erreurs
-                         st.error("Une erreur est survenue. Veuillez réessayer.")
-               else:
-                    st.warning("Veuillez entrer un nom d'utilisateur.")
+               response = requests.post("http://fastapi:8000/auth/", json= {"username":normalized_username, "password": password})
+               result = response.json()
+
+               if response.status_code == 201:  # Utilisateur créé avec succès
+                    st.success(f"Inscription réussie ! Bienvenue {username}. Vous pouvez maintenant vous connecter.")
+                    st.balloons()
+               elif response.status_code == 400:  # Erreur d'utilisateur déjà enregistré ou autres erreurs de validation
+                    error_message = response.json().get("detail", "Une erreur est survenue.")
+                    st.error(error_message)  # Afficher le message d'erreur détaillé
+               else:  # Autres erreurs
+                    st.error("Une erreur est survenue. Veuillez réessayer.")
 
      # Concerne la partie identification
      st.markdown("---")
@@ -85,18 +93,21 @@ elif page == pages[3]:
           submitted = st.form_submit_button("Se connecter")
 
           if submitted:
-               if username and password:
-                    response = requests.post("http://fastapi:8000/auth/token", data= {"username":username, "password": password})
 
-                    if response.status_code == 200:  # Utilisateur coonecté
-                         st.success(f"Connexion réussie ! Bienvenue {username}. Vous pouvez maintenant poursuivre sur les prochaines pages.")
-                         st.balloons()
-                         st.session_state.is_logged_in = True
+               # Convertir le nom d'utilisateur en minuscules avant l'envoi
+               normalized_username = username.lower()
 
-                    elif response.status_code == 401:  # Erreur d'utilisateur déjà enregistré
-                         st.error("Utilisateur inconnu. Veuillez vous inscrire.")
-                    else:
-                         st.error("Problème de connexion. Veuillez essayer ultérireurement")
+               response = requests.post("http://fastapi:8000/auth/token", data= {"username":normalized_username, "password": password})
+
+               if response.status_code == 200:  # Utilisateur coonecté
+                    st.success(f"Connexion réussie ! Bienvenue {username}. Vous pouvez maintenant poursuivre sur les prochaines pages.")
+                    st.balloons()
+                    st.session_state.is_logged_in = True
+
+               elif response.status_code == 401:  # Erreur d'utilisateur déjà enregistré
+                    st.error("Utilisateur inconnu. Veuillez vous inscrire.")
+               else:
+                    st.error("Problème de connexion. Veuillez essayer ultérieurement")
 
 # Vérifiez si l'utilisateur est connecté avant d'afficher les pages 4 et 5
 if st.session_state.is_logged_in:
@@ -120,23 +131,29 @@ if st.session_state.is_logged_in:
                submitted = form.form_submit_button("Envoyer")
 
           if submitted:
-               # Vérification que user_id est un entier et dans la plage spécifiée
-               try:
-                    user_id = int(user_id_input)  # Convertir en entier
-                    if user_id < 1 or user_id > 138493:
-                         st.error("Le numéro d'utilisateur doit être compris entre 1 et 138493.")
-                    else:
-                         # Si la validation passe, envoyer la requête à l'API
-                         req = requests.post("http://fastapi:8000/predict/", data={'userId': user_id})
-                         result = req.json()
 
-                         # Affichage des résultats sous forme de liste numérotée
-                         st.write("Voici les recommandations de films :")
+               # Envoyer la requête à l'API
+               req = requests.post("http://fastapi:8000/predict/", data={'userId': user_id_input})
+               result = req.json()
 
-                         for index, title in result.items():
-                              st.markdown(f"{index}. {title}")
-               except ValueError:
-                    st.error("Veuillez entrer un numéro d'utilisateur valide (un entier).")
+               # Affichage des résultats sous forme de liste numérotée
+               st.write("Voici les recommandations de films :")
+
+               # Nombre total de films à afficher
+               num_movies = len(result)
+
+               # Créer des colonnes pour le tableau
+               cols = st.columns(5)  # 5 colonnes
+
+               # Afficher les films dans un tableau de 5 colonnes
+               for i, (key, value) in enumerate(result.items()):
+                    col_index = i % 5  # Calculer l'index de colonne
+                    with cols[col_index]:  # Utiliser la colonne correspondante
+                         st.image(value["cover"], caption=value["title"], use_column_width=True)
+
+               # Si nous avons atteint la fin d'une ligne (2 lignes ici), nous pouvons faire une pause
+               if (i + 1) % 5 == 0 and (i + 1) < num_movies:
+                    st.write("")  # Ajouter une ligne vide pour séparer les lignes
 
      elif page == pages[5]:
           st.header("Page 5")

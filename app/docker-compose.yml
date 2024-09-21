@@ -20,6 +20,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: antoine
       MONGO_INITDB_ROOT_PASSWORD: pela
     container_name: mongodb
+    networks:
+      - app
 
   # Service pour le scraping
   # scraper:
@@ -45,8 +47,8 @@ services:
     restart: always
     networks:
       - app
-    depends_on:
-      - mongodb
+    # depends_on:
+    #   - mongodb
     container_name: fastapi
     # Service pour Streamlit
   streamlit:
@@ -73,18 +75,33 @@ services:
     #     - "8080:8080"
 
     # Service pour Prometheus
-    # prometheus:
-    #   image: prom/prometheus:latest
-    #   volumes:
-    #     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    #   ports:
-    #     - "9090:9090"
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    container_name: prometheus
+    networks:
+      - app
 
-    # Service pour Grafana
-    # grafana:
-    #   image: grafana/grafana:latest
-    #   ports:
-    #     - "3000:3000"
+  # Service pour Grafana
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    container_name: grafana
+    networks:
+      - app
+
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node_exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100" # Expose le port pour Node Exporter
+    networks:
+      - app
 
 networks:
   app:
