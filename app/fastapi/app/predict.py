@@ -8,7 +8,6 @@ from typing import List, Dict, Any
 from prometheus_client import Counter, Histogram, CollectorRegistry
 import time
 
-
 # Création d'un routeur pour gérer les routes de prédiction
 router = APIRouter(
     prefix='/predict',  # Préfixe pour toutes les routes dans ce routeur
@@ -86,6 +85,7 @@ def create_user_matrix(ratings: pd.DataFrame, movies: pd.DataFrame) -> pd.DataFr
 ratings = read_ratings('ratings.csv')
 movies = read_movies('movies.csv')
 links = read_links('links2.csv')
+
 df = create_user_matrix(ratings, movies)
 
 # Chemin du fichier PKL
@@ -171,6 +171,7 @@ error_counter = Counter(
     labelnames=['error_type'],
     registry=collector)
 
+
 # Route pour récupérer les tops 10 de notre modèle
 @router.post("/")
 async def predict(request: Request) -> Dict[str, Any]:
@@ -180,15 +181,18 @@ async def predict(request: Request) -> Dict[str, Any]:
     :param request: La requête HTTP contenant l'ID utilisateur.
     :return: Un dictionnaire avec les recommandations de films.
     """
+
     # Démarrer le chronomètre pour mesurer la durée de la requête
     start_time = time.time()
     # Incrémenter le compteur de requêtes pour prometheus
     nb_of_requests_counter.labels(method='POST', endpoint='/predict').inc()
+
     # Récupération des données Streamlit
     try:
         # Récupération des données du formulaire
         request_data = await request.form()
         print({'request_data' : request_data})
+
         user_id = int(request_data.get('userId'))
         # Récupérer et convertir en entier
         # valider l'user_id
@@ -225,3 +229,4 @@ async def predict(request: Request) -> Dict[str, Any]:
         error_counter.labels(error_type='user_id_not_found').inc()
         status_code_counter.labels(status_code = "400").inc()
         raise HTTPException(status_code=400, detail="User ID not found in the request")
+

@@ -13,3 +13,4 @@ prometheus-fastapi-instrumentator
 requests
 Pillow
 matplotlib
+

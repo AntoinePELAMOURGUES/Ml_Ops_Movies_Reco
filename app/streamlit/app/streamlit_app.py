@@ -4,8 +4,10 @@ import requests
 
 # Setup web page
 st.set_page_config(
+
      page_title="API de Recommndation de films",
      #  page_icon=APP_ICON_URL,
+
      layout="wide",
 )
 
@@ -64,6 +66,7 @@ elif page == pages[3]:
           submitted = st.form_submit_button("S'inscrire")
 
           if submitted:
+            
                # Convertir le nom d'utilisateur en minuscules avant l'envoi
                normalized_username = username.lower()
 
@@ -79,7 +82,6 @@ elif page == pages[3]:
                else:  # Autres erreurs
                     st.error("Une erreur est survenue. Veuillez réessayer.")
 
-
      # Concerne la partie identification
      st.markdown("---")
 
@@ -91,6 +93,7 @@ elif page == pages[3]:
           submitted = st.form_submit_button("Se connecter")
 
           if submitted:
+
                # Convertir le nom d'utilisateur en minuscules avant l'envoi
                normalized_username = username.lower()
 
@@ -151,7 +154,6 @@ if st.session_state.is_logged_in:
                # Si nous avons atteint la fin d'une ligne (2 lignes ici), nous pouvons faire une pause
                if (i + 1) % 5 == 0 and (i + 1) < num_movies:
                     st.write("")  # Ajouter une ligne vide pour séparer les lignes
-
 
      elif page == pages[5]:
           st.header("Page 5")
