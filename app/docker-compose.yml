@@ -38,7 +38,7 @@ services:
     networks:
       - app
     container_name: fastapi
-    # Service pour Streamlit
+  # Service pour Streamlit
   streamlit:
     build:
       context: ./streamlit
@@ -94,8 +94,7 @@ services:
     networks:
       - app
 
-volumes:
-  shared_volume:./shared_volume
+volumes: shared_volume:./shared_volume
 
 networks:
   app:
