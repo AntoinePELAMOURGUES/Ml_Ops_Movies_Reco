@@ -1,13 +1,12 @@
 services:
   # Service pour le prétraitement et l'entraînement avec la bibliothèque Surprise
-  # preprocessing:
+  # model-trainer-predictor:
   #   build:
-  #     context: ./preprocessing
+  #     context: ./model-trainer-predictor
   #     dockerfile: Dockerfile
   #   volumes:
-  #     - ./preprocessing:/app
-  #   depends_on:
-  #     - mongodb
+  #     - shared_volume:/app/data
+  #   container_name: model_trainer_predictor
 
   # Service pour MongoDB
   mongodb:
@@ -23,16 +22,6 @@ services:
     networks:
       - app
 
-  # Service pour le scraping
-  # scraper:
-  #   build:
-  #     context: ./scraping
-  #     dockerfile: Dockerfile
-  #   volumes:
-  #     - ./scraping:/app
-  #   depends_on:
-  #     - mongodb
-
   # Service pour FastAPI
   fastapi:
     build:
@@ -42,13 +31,12 @@ services:
       - .env
     volumes:
       - ./fastapi:/app
+      - shared_volume:/app
     ports:
       - "8000:8000"
     restart: always
     networks:
       - app
-    # depends_on:
-    #   - mongodb
     container_name: fastapi
     # Service pour Streamlit
   streamlit:
@@ -70,9 +58,12 @@ services:
     #     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
     #     - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////root/airflow.db
     #   volumes:
-    #     - ./airflow/dags:/opt/airflow/dags
+    #     - ./shared_volume/dags:/opt/airflow/dags
     #   ports:
     #     - "8080:8080"
+    #   container_name: airflow
+    #   networks:
+    #   - app
 
     # Service pour Prometheus
   prometheus:
@@ -102,6 +93,9 @@ services:
       - "9100:9100" # Expose le port pour Node Exporter
     networks:
       - app
+
+volumes:
+  shared_volume:./shared_volume
 
 networks:
   app:

@@ -193,7 +193,7 @@ async def predict(request: Request) -> Dict[str, Any]:
         request_data = await request.form()
         print({'request_data' : request_data})
 
-        user_id = int(request_data.get('userId'))
+        user_id = request_data.get('userId')
         # Récupérer et convertir en entier
         # valider l'user_id
         userId_error = validate_userId(user_id)
