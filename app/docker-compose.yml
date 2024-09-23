@@ -1,12 +1,12 @@
 services:
   # Service pour le prétraitement et l'entraînement avec la bibliothèque Surprise
-  # model-trainer-predictor:
-  #   build:
-  #     context: ./model-trainer-predictor
-  #     dockerfile: Dockerfile
-  #   volumes:
-  #     - shared_volume:/app/data
-  #   container_name: model_trainer_predictor
+  model-trainer-predictor:
+    build:
+      context: ./model-trainer-predictor
+      dockerfile: Dockerfile
+    volumes:
+      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume:/app/data
+    container_name: model_trainer_predictor
 
   # Service pour MongoDB
   mongodb:

@@ -2,12 +2,13 @@ import pandas as pd
 import os
 import json
 import pickle
-from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
-from fastapi import Request, APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 from prometheus_client import Counter, Histogram, CollectorRegistry
 import time
 from pydantic import BaseModel
+from surprise.prediction_algorithms.matrix_factorization import SVD
+import re
 
 # Création d'un routeur pour gérer les routes de prédiction
 router = APIRouter(
@@ -52,11 +53,7 @@ def read_links(links_csv: str, data_dir: str = "/app/raw/") -> pd.DataFrame:
     print("Dataset links chargé")
     return df
 
-user_encoder = LabelEncoder()
-movie_encoder = LabelEncoder()
-mlb = MultiLabelBinarizer()
-
-def create_user_matrix(ratings: pd.DataFrame, movies: pd.DataFrame) -> pd.DataFrame:
+def merge_dataset(ratings: pd.DataFrame, movies: pd.DataFrame, links: pd.DataFrame) -> pd.DataFrame:
     """
     Crée une matrice utilisateur à partir des évaluations et des informations sur les films.
 
@@ -66,26 +63,15 @@ def create_user_matrix(ratings: pd.DataFrame, movies: pd.DataFrame) -> pd.DataFr
     :return: DataFrame fusionné et prétraité.
     """
     # Fusionner les évaluations et les informations sur les films
-    df = ratings.merge(movies[['movieId', 'genres']], on="movieId", how="left")
-
-    # Encoder userId et movieId
-    df['userId'] = user_encoder.fit_transform(df['userId'])
-    df['movieId'] = movie_encoder.fit_transform(df['movieId'])
-
-    # Traitement des genres
-    df = df.join(pd.DataFrame(mlb.fit_transform(df.pop('genres').str.split('|')),
-                               columns=mlb.classes_, index=df.index))
-
-    # Supprimer la colonne "(no genres listed)" si elle existe
-    df = df.drop("(no genres listed)", axis=1, errors='ignore')
-
+    df = ratings[['userId', 'movieId', 'rating']].merge(movies[['movieId', 'title']], on="movieId", how="left")
+    df = df.merge(links, on = 'movieId', how = 'left')
     print("Dataset fusionnés et prétraités")
 
     return df
 
 # Récupération des films les mieux notés par l'utilisateur
-def best_user_movies(user_id, n =5):
-    top_user_movies = (new_df[new_df['userId'] == user_id].sort_values(by='rating', ascending=False))[:n]
+def best_user_movies(df, user_id, n =5):
+    top_user_movies = (df[df['userId'] == user_id].sort_values(by='rating', ascending=False))[:n]
     top_title = list(top_user_movies['title'])
     top_cover = list(top_user_movies['cover_link'])
     return top_title, top_cover
@@ -94,16 +80,48 @@ def best_user_movies(user_id, n =5):
 ratings = read_ratings('ratings.csv')
 movies = read_movies('movies.csv')
 links = read_links('links2.csv')
-new_df = ratings[['userId', 'movieId', 'rating']].merge(movies[['movieId', 'title']], on = 'movieId', how = 'left')
-new_df = new_df.merge(links, on = 'movieId', how = 'left')
-df = create_user_matrix(ratings, movies)
+df = merge_dataset(ratings, movies, links)
 
-# Chemin du fichier PKL
-file_path = '/app/model/model_SVD_1.pkl'
+def load_latest_model(directory: str) -> SVD:
+    """Charge le modèle avec la dernière version à partir d'un répertoire."""
+    # Vérifier si le répertoire existe
+    if not os.path.exists(directory):
+        raise FileNotFoundError(f"Le répertoire {directory} n'existe pas.")
 
-# Charger le modèle SVD depuis le fichier PKL
-with open(file_path, 'rb') as file:
-    model_svd = pickle.load(file)
+    # Liste des fichiers dans le répertoire
+    files = os.listdir(directory)
+
+    # Filtrer les fichiers pour ne garder que ceux qui correspondent au modèle SVD
+    model_files = [f for f in files if f.startswith("model_SVD") and f.endswith(".pkl")]
+
+    if not model_files:
+        raise FileNotFoundError("Aucun modèle SVD trouvé dans le répertoire.")
+
+    # Extraire les numéros de version et trouver le fichier avec la plus grande version
+    versioned_files = {}
+
+    for model_file in model_files:
+        # Utiliser une expression régulière pour extraire la version du nom de fichier
+        match = re.search(r'_(v\d+)', model_file)
+        if match:
+            version = match.group(1)  # Récupérer la version (ex: v1)
+            versioned_files[version] = model_file
+
+    # Trier les versions pour obtenir la dernière
+    latest_version = sorted(versioned_files.keys(), key=lambda x: int(x[1:]))[-1]
+    latest_model_file = versioned_files[latest_version]
+
+    # Charger le modèle
+    filepath = os.path.join(directory, latest_model_file)
+
+    with open(filepath, 'rb') as file:
+        model = pickle.load(file)
+        print(f'Modèle chargé depuis {filepath} (version {latest_version})')
+
+    return model
+
+directory = "/app/model"
+model_svd = load_latest_model(directory)
 
 def get_top_n_recommendations(user_id: int, n: int = 10) -> List[str]:
     """
@@ -113,29 +131,33 @@ def get_top_n_recommendations(user_id: int, n: int = 10) -> List[str]:
     :param n: Le nombre de recommandations à retourner (par défaut 10).
     :return: Une liste des titres de films recommandés.
     """
+    # Obtenir les films déjà notés par l'utilisateur
+    user_movies = df[df['userId'] == user_id]['title'].unique()
 
-    user_movies = df[df['userId'] == user_id]['movieId'].unique()
-
-    all_movies = df['movieId'].unique()
+    # Obtenir tous les titres de films
+    all_movies = df['title'].unique()
 
     # Identifier les films qui n'ont pas été notés par l'utilisateur
     movies_to_predict = list(set(all_movies) - set(user_movies))
 
-    # Créer des paires utilisateur-film pour prédiction
-    user_movie_pairs = [(user_id, movie_id, 0) for movie_id in movies_to_predict]
+    # Créer des paires utilisateur-titre pour prédiction
+    user_movie_pairs = [(user_id, title, 0) for title in movies_to_predict]
 
     # Prédictions avec le modèle SVD
-    predictions_cf = model_svd.test(user_movie_pairs)
+    predictions_cf = []
+
+    for user_id, title, _ in user_movie_pairs:
+        movie_id = df[df['title'] == title]['movieId'].values[0]  # Récupérer movieId à partir du titre
+        predicted_rating = model_svd.predict(user_id, movie_id).est  # Utiliser predict avec movieId
+        predictions_cf.append((title, predicted_rating))
 
     # Trier par note prédite et récupérer les meilleurs n résultats
-    top_n_recommendations = sorted(predictions_cf, key=lambda x: x.est, reverse=True)[:n]
+    top_n_recommendations = sorted(predictions_cf, key=lambda x: x[1], reverse=True)[:n]
 
-    top_n_movie_ids = [int(pred.iid) for pred in top_n_recommendations]
+    # Extraire seulement les titres des films recommandés
+    top_n_movies = [title for title, _ in top_n_recommendations]
 
-    # Décoder les IDs de film en titres
-    top_n_movies = movie_encoder.inverse_transform(top_n_movie_ids)
-
-    return top_n_movies.tolist()
+    return top_n_movies
 
 def validate_userId(userId):
     # Vérifier si userId est un entier
@@ -206,7 +228,7 @@ async def predict(movie_user_id: MovieUserId) -> Dict[str, Any]:
     if userId_error:
         error_counter.labels(error_type='invalid_userId').inc()
         raise HTTPException(status_code=400, detail=userId_error)
-    best_user_title, best_user_cover = best_user_movies(user_id)
+    best_user_title, best_user_cover = best_user_movies(df, user_id)
     recommendations = get_top_n_recommendations(user_id)
     top_n_movies_titles = movies[movies['movieId'].isin(recommendations)]['title'].tolist()
     top_n_movies_covers = links[links['movieId'].isin(recommendations)]['cover_link'].tolist()
