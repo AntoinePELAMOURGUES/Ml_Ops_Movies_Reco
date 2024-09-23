@@ -7,6 +7,7 @@ from fastapi import Request, APIRouter, HTTPException
 from typing import List, Dict, Any
 from prometheus_client import Counter, Histogram, CollectorRegistry
 import time
+from pydantic import BaseModel
 
 # Création d'un routeur pour gérer les routes de prédiction
 router = APIRouter(
@@ -14,7 +15,7 @@ router = APIRouter(
     tags=['predict']    # Tag pour la documentation
 )
 
-def read_ratings(ratings_csv: str, data_dir: str = "/code/app/data/") -> pd.DataFrame:
+def read_ratings(ratings_csv: str, data_dir: str = "/app/raw/") -> pd.DataFrame:
     """
     Lit le fichier CSV contenant les évaluations des films.
 
@@ -26,7 +27,7 @@ def read_ratings(ratings_csv: str, data_dir: str = "/code/app/data/") -> pd.Data
     print("Dataset ratings chargé")
     return data
 
-def read_movies(movies_csv: str, data_dir: str = "/code/app/data/") -> pd.DataFrame:
+def read_movies(movies_csv: str, data_dir: str = "/app/raw/") -> pd.DataFrame:
     """
     Lit le fichier CSV contenant les informations sur les films.
 
@@ -38,7 +39,7 @@ def read_movies(movies_csv: str, data_dir: str = "/code/app/data/") -> pd.DataFr
     print("Dataset movies chargé")
     return df
 
-def read_links(links_csv: str, data_dir: str = "/code/app/data/") -> pd.DataFrame:
+def read_links(links_csv: str, data_dir: str = "/app/raw/") -> pd.DataFrame:
     """
     Lit le fichier CSV contenant les informations sur les liens des affiches scrappés.
 
@@ -79,17 +80,26 @@ def create_user_matrix(ratings: pd.DataFrame, movies: pd.DataFrame) -> pd.DataFr
     df = df.drop("(no genres listed)", axis=1, errors='ignore')
 
     print("Dataset fusionnés et prétraités")
+
     return df
+
+# Récupération des films les mieux notés par l'utilisateur
+def best_user_movies(user_id, n =5):
+    top_user_movies = (new_df[new_df['userId'] == user_id].sort_values(by='rating', ascending=False))[:n]
+    top_title = list(top_user_movies['title'])
+    top_cover = list(top_user_movies['cover_link'])
+    return top_title, top_cover
 
 # Chargement des données
 ratings = read_ratings('ratings.csv')
 movies = read_movies('movies.csv')
 links = read_links('links2.csv')
-
+new_df = ratings[['userId', 'movieId', 'rating']].merge(movies[['movieId', 'title']], on = 'movieId', how = 'left')
+new_df = new_df.merge(links, on = 'movieId', how = 'left')
 df = create_user_matrix(ratings, movies)
 
 # Chemin du fichier PKL
-file_path = '/code/app/model/model_SVD_1.pkl'
+file_path = '/app/model/model_SVD_1.pkl'
 
 # Charger le modèle SVD depuis le fichier PKL
 with open(file_path, 'rb') as file:
@@ -171,62 +181,55 @@ error_counter = Counter(
     labelnames=['error_type'],
     registry=collector)
 
+# Modèle Pydantic pour la récupération de l'user_id lié aux films
+class MovieUserId(BaseModel):
+    userId : int  # Nom d'utilisateur
 
 # Route pour récupérer les tops 10 de notre modèle
 @router.post("/")
-async def predict(request: Request) -> Dict[str, Any]:
+async def predict(movie_user_id: MovieUserId) -> Dict[str, Any]:
     """
     Route API pour obtenir des recommandations de films basées sur l'ID utilisateur.
 
     :param request: La requête HTTP contenant l'ID utilisateur.
     :return: Un dictionnaire avec les recommandations de films.
     """
-
     # Démarrer le chronomètre pour mesurer la durée de la requête
     start_time = time.time()
     # Incrémenter le compteur de requêtes pour prometheus
     nb_of_requests_counter.labels(method='POST', endpoint='/predict').inc()
 
     # Récupération des données Streamlit
-    try:
-        # Récupération des données du formulaire
-        request_data = await request.form()
-        print({'request_data' : request_data})
+    user_id = movie_user_id.user_id
+    # valider l'user_id
+    userId_error = validate_userId(user_id)
+    if userId_error:
+        error_counter.labels(error_type='invalid_userId').inc()
+        raise HTTPException(status_code=400, detail=userId_error)
+    best_user_title, best_user_cover = best_user_movies(user_id)
+    recommendations = get_top_n_recommendations(user_id)
+    top_n_movies_titles = movies[movies['movieId'].isin(recommendations)]['title'].tolist()
+    top_n_movies_covers = links[links['movieId'].isin(recommendations)]['cover_link'].tolist()
+        # Créer un dictionnaire associant chaque titre à son lien de couverture
+    result = {
+        "best_user_movies": [
+            {"title": user_title, "cover": user_cover}
+            for user_title, user_cover in zip(best_user_title, best_user_cover)
+        ],
+        "recommendations": [
+            {"title": title, "cover": cover}
+            for title, cover in zip(top_n_movies_titles, top_n_movies_covers)
+        ]
+    }
+    # Mesurer la taille de la réponse et l'enregistrer
+    response_size = len(json.dumps(result))
+    # Calculer la durée et enregistrer dans l'histogramme
+    duration = time.time() - start_time
+    # Enregistrement des métriques
+    status_code_counter.labels(status_code = "200").inc()
+    duration_of_requests_histogram.labels(method='POST', endpoint='/predict', user_id=str(user_id)).observe(duration)
+    response_size_histogram.labels(method='POST', endpoint='/predict').observe(response_size)
 
-        user_id = request_data.get('userId')
-        # Récupérer et convertir en entier
-        # valider l'user_id
-        userId_error = validate_userId(user_id)
-        if userId_error:
-            error_counter.labels(error_type='invalid_userId').inc()
-            raise HTTPException(status_code=400, detail=userId_error)
-        recommendations = get_top_n_recommendations(user_id)
-        top_n_movies_titles = movies[movies['movieId'].isin(recommendations)]['title'].tolist()
-        top_n_movies_covers = links[links['movieId'].isin(recommendations)]['cover_link'].tolist()
-         # Créer un dictionnaire associant chaque titre à son lien de couverture
-        result = {
-            str(i): {
-                "title": title,
-                "cover": cover
-            } for i, (title, cover) in enumerate(zip(top_n_movies_titles, top_n_movies_covers), 1)
-        }
-        # Mesurer la taille de la réponse et l'enregistrer
-        response_size = len(json.dumps(result))
-        # Calculer la durée et enregistrer dans l'histogramme
-        duration = time.time() - start_time
-        # Enregistrement des métriques
-        status_code_counter.labels(status_code = "200").inc()
-        duration_of_requests_histogram.labels(method='POST', endpoint='/predict', user_id=str(user_id)).observe(duration)
-        response_size_histogram.labels(method='POST', endpoint='/predict').observe(response_size)
+    return result
 
-        return result
-
-    except ValueError:
-        error_counter.labels(error_type='invalid_user_id').inc()
-        status_code_counter.labels(status_code = "400").inc()
-        raise HTTPException(status_code=400, detail="Invalid user ID")
-    except KeyError:
-        error_counter.labels(error_type='user_id_not_found').inc()
-        status_code_counter.labels(status_code = "400").inc()
-        raise HTTPException(status_code=400, detail="User ID not found in the request")
 

@@ -1,4 +1,4 @@
-from .database import Base
+from database import Base
 from sqlalchemy import Column, Integer, String
 
 # définition du modèle User avec les champs appropriés pour base de données movies_app_users

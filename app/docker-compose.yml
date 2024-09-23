@@ -12,7 +12,7 @@ services:
   mongodb:
     image: mongo:latest
     volumes:
-      - ./mongodb_data:/data/db
+      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/mongodb_data:/data/db
     ports:
       - "27017:27017"
     environment:
@@ -30,8 +30,10 @@ services:
     env_file:
       - .env
     volumes:
-      - ./fastapi:/app
-      - shared_volume:/app
+      - ./fastapi/app:/app
+      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/raw:/app/raw
+      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/model:/app/model
+      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/user_db:/app/user_db
     ports:
       - "8000:8000"
     restart: always
@@ -93,8 +95,6 @@ services:
       - "9100:9100" # Expose le port pour Node Exporter
     networks:
       - app
-
-volumes: shared_volume:./shared_volume
 
 networks:
   app:

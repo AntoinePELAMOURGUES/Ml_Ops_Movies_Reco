@@ -61,18 +61,25 @@ elif page == pages[3]:
                       - Le nom d'utilisateur ne doit contenir que des lettres, chiffres et underscores.
                       - Le mot de passe doit contenir au moins 12 caractères, un chiffre, une majuscule et un cartère spécial.
                       """)
-          username = st.text_input("Nom d'utilisateur")
-          password = st.text_input("Mot de passe", type="password")
+          # Utiliser session_state pour stocker les valeurs permettant remise à blanc du formulaire après submitted
+          if 'username_reg' not in st.session_state:
+               st.session_state.username_reg = ""
+          if 'password_reg' not in st.session_state:
+               st.session_state.password_reg = ""
+
+          username = st.text_input("Nom d'utilisateur", value=st.session_state.username_reg)
+          password = st.text_input("Mot de passe", type="password", value=st.session_state.password_reg)
           submitted = st.form_submit_button("S'inscrire")
 
           if submitted:
-            
+
                # Convertir le nom d'utilisateur en minuscules avant l'envoi
                normalized_username = username.lower()
 
                response = requests.post("http://fastapi:8000/auth/", json= {"username":normalized_username, "password": password})
                result = response.json()
-
+               st.session_state.username_reg = ""
+               st.session_state.password_reg = ""
                if response.status_code == 201:  # Utilisateur créé avec succès
                     st.success(f"Inscription réussie ! Bienvenue {username}. Vous pouvez maintenant vous connecter.")
                     st.balloons()
@@ -88,8 +95,13 @@ elif page == pages[3]:
      # Formulaire de connexion
      with st.form("connexion_form"):
           st.header("Connexion")
-          username = st.text_input("Nom d'utilisateur")
-          password = st.text_input("Mot de passe", type="password")
+          if 'username_conn' not in st.session_state:
+            st.session_state.username_conn = ""
+          if 'password_conn' not in st.session_state:
+               st.session_state.password_conn = ""
+
+          username = st.text_input("Nom d'utilisateur", value=st.session_state.username_conn)
+          password = st.text_input("Mot de passe", type="password", value=st.session_state.password_conn)
           submitted = st.form_submit_button("Se connecter")
 
           if submitted:
@@ -98,16 +110,18 @@ elif page == pages[3]:
                normalized_username = username.lower()
 
                response = requests.post("http://fastapi:8000/auth/token", data= {"username":normalized_username, "password": password})
-
+               st.session_state.username_conn = ""
+               st.session_state.password_conn = ""
                if response.status_code == 200:  # Utilisateur coonecté
                     st.success(f"Connexion réussie ! Bienvenue {username}. Vous pouvez maintenant poursuivre sur les prochaines pages.")
                     st.balloons()
                     st.session_state.is_logged_in = True
 
-               elif response.status_code == 401:  # Erreur d'utilisateur déjà enregistré
-                    st.error("Utilisateur inconnu. Veuillez vous inscrire.")
                else:
-                    st.error("Problème de connexion. Veuillez essayer ultérieurement")
+                    # Erreur d'utilisateur déjà enregistré
+                    error_message = response.json().get("detail", "Une erreur est survenue.")
+                    st.error(error_message)  # Afficher le message d'erreur détaillé
+
 
 # Vérifiez si l'utilisateur est connecté avant d'afficher les pages 4 et 5
 if st.session_state.is_logged_in:
@@ -127,33 +141,39 @@ if st.session_state.is_logged_in:
           form = st.form("Infos_utilisateur")
 
           with form:
-               user_id_input = form.text_input("Numéro utilisateur")
+               user_id_input = form.number_input("Numéro utilisateur", min_value=1, step=1, format="%d")
                submitted = form.form_submit_button("Envoyer")
 
           if submitted:
 
                # Envoyer la requête à l'API
-               req = requests.post("http://fastapi:8000/predict/", data={'userId': user_id_input})
+               req = requests.post("http://fastapi:8000/predict/", json={'user_id': user_id_input})
                result = req.json()
+               # Affichage des meilleurs films de l'utilisateur
+               st.write("Mes 5 films préférés:")
+               if "best_user_movies" in result:
+                    best_movies = result["best_user_movies"]
 
-               # Affichage des résultats sous forme de liste numérotée
-               st.write("Voici les recommandations de films :")
+                    # Créer des colonnes pour afficher les meilleurs films
+                    cols_best_movies = st.columns(5)  # 5 colonnes pour les meilleurs films
 
-               # Nombre total de films à afficher
-               num_movies = len(result)
+                    for i, movie in enumerate(best_movies):
+                         col_index = i % 5  # Calculer l'index de colonne
+                         with cols_best_movies[col_index]:  # Utiliser la colonne correspondante
+                              st.image(movie["cover"], caption=movie["title"], use_column_width=True)
 
-               # Créer des colonnes pour le tableau
-               cols = st.columns(5)  # 5 colonnes
+                    # Affichage des recommandations de films
+                    st.write("Voici les recommandations de films :")
+                    if "recommendations" in result:
+                         recommended_movies = result["recommendations"]
 
-               # Afficher les films dans un tableau de 5 colonnes
-               for i, (key, value) in enumerate(result.items()):
-                    col_index = i % 5  # Calculer l'index de colonne
-                    with cols[col_index]:  # Utiliser la colonne correspondante
-                         st.image(value["cover"], caption=value["title"], use_column_width=True)
+                         # Créer des colonnes pour afficher les recommandations
+                         cols_recommended_movies = st.columns(5)  # 5 colonnes pour les recommandations
 
-               # Si nous avons atteint la fin d'une ligne (2 lignes ici), nous pouvons faire une pause
-               if (i + 1) % 5 == 0 and (i + 1) < num_movies:
-                    st.write("")  # Ajouter une ligne vide pour séparer les lignes
+                         for i, movie in enumerate(recommended_movies):
+                              col_index = i % 5  # Calculer l'index de colonne
+                              with cols_recommended_movies[col_index]:  # Utiliser la colonne correspondante
+                                   st.image(movie["cover"], caption=movie["title"], use_column_width=True)
 
      elif page == pages[5]:
           st.header("Page 5")

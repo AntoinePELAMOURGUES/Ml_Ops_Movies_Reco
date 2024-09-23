@@ -1,5 +1,5 @@
 /src/data
-/app/mongodb_data
+/app/shared_volume
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

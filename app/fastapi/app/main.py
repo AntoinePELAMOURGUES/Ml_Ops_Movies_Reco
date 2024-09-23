@@ -2,12 +2,12 @@ from typing import Union
 from fastapi import FastAPI, status, Depends, HTTPException
 from typing import Annotated
 from sqlalchemy.orm import Session
-from .database import engine, SessionLocal
-from .models import *  # Importation de tous les modèles
-from .models import Base  # Importation de la base pour créer les tables
+from database import engine, SessionLocal
+from models import *  # Importation de tous les modèles
+from models import Base  # Importation de la base pour créer les tables
 
-from .auth import get_current_user, router as auth_router # Importation des fonctions d'authentification et du routeur
-from .predict import router as predict_router # Importation des fonctions de predictions
+from auth import get_current_user, router as auth_router # Importation des fonctions d'authentification et du routeur
+from predict import router as predict_router # Importation des fonctions de predictions
 from prometheus_fastapi_instrumentator import Instrumentator
 
 
