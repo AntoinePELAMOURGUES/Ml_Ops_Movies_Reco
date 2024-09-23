@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker  # Importation de la fonction pour crée
 from sqlalchemy.ext.declarative import declarative_base  # Importation de la classe de base déclarative
 
 # URL de la base de données SQLite
-SQLALCHEMY_DATABASE_URL = 'sqlite:///./movies_app_users.db'
+SQLALCHEMY_DATABASE_URL = 'sqlite:////app/user_db/movies_app_users.db'
 
 # Création de l'engine de la base de données
 # connect_args={'check_same_thread': False} est utilisé pour permettre l'accès à la base de données depuis plusieurs threads
