@@ -2,7 +2,8 @@ import pandas as pd
 import os
 import json
 import pickle
-from fastapi import APIRouter, HTTPException
+from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
+from fastapi import Request, APIRouter, HTTPException
 from typing import List, Dict, Any
 from prometheus_client import Counter, Histogram, CollectorRegistry
 import time
@@ -119,6 +120,8 @@ def get_top_n_recommendations(user_id: int, n: int = 10) -> List[str]:
     :param n: Le nombre de recommandations à retourner (par défaut 10).
     :return: Une liste des titres de films recommandés.
     """
+    # Obtenir les films déjà notés par l'utilisateur
+    user_movies = df[df['userId'] == user_id]['title'].unique()
 
     # Obtenir les films déjà notés par l'utilisateur
     user_movies = df[df['userId'] == user_id]['movieId'].unique()
@@ -133,24 +136,26 @@ def get_top_n_recommendations(user_id: int, n: int = 10) -> List[str]:
     user_movie_pairs = [(user_id, movie_id, 0) for movie_id in movies_to_predict]
 
     # Prédictions avec le modèle SVD
-    predictions_cf = model_svd.test(user_movie_pairs)
+    predictions_cf = []
+
+    for user_id, title, _ in user_movie_pairs:
+        movie_id = df[df['title'] == title]['movieId'].values[0]  # Récupérer movieId à partir du titre
+        predicted_rating = model_svd.predict(user_id, movie_id).est  # Utiliser predict avec movieId
+        predictions_cf.append((title, predicted_rating))
 
     top_n_recommendations = sorted(predictions_cf, key = lambda x: x.est)[:n]
 
     for pred in top_n_recommendations:
         predicted_rating = pred.est
 
-    top_n_movie_ids = [int(pred.iid) for pred in top_n_recommendations]
+    # Extraire seulement les titres des films recommandés
+    top_n_movies = [title for title, _ in top_n_recommendations]
 
     top_n_movies = movie_encoder.inverse_transform(top_n_movie_ids)
     print({"top 10 movieId" : top_n_movies})
     return top_n_movies
 
 def validate_userId(userId):
-    # Vérifier si userId est un entier
-    if not isinstance(userId, int):
-        return "Le numéro d'utilisateur doit être un entier."
-
     # Vérifier si userId est dans la plage valide
     if userId < 1 or userId > 138493:
         return "Le numéro d'utilisateur doit être compris entre 1 et 138493."
@@ -194,14 +199,10 @@ error_counter = Counter(
 class MovieUserId(BaseModel):
     userId : int  # Nom d'utilisateur
 
-# Route pour récupérer les tops 10 de notre modèle
 @router.post("/")
 async def predict(movie_user_id: MovieUserId) -> Dict[str, Any]:
     """
     Route API pour obtenir des recommandations de films basées sur l'ID utilisateur.
-
-    :param request: La requête HTTP contenant l'ID utilisateur.
-    :return: Un dictionnaire avec les recommandations de films.
     """
     # Démarrer le chronomètre pour mesurer la durée de la requête
     start_time = time.time()
