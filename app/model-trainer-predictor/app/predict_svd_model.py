@@ -4,24 +4,38 @@ import pandas as pd
 from surprise.model_selection import cross_validate
 import os
 import pickle
+from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
 
-def read_ratings(ratings_csv: str, data_dir: str = "/home/antoine/Ml_Ops_Movies_Reco/src/data/data/raw") -> pd.DataFrame:
+def read_ratings(ratings_csv: str, data_dir: str = "/app/data/") -> pd.DataFrame:
     """Lit le fichier CSV contenant les évaluations des films."""
     data = pd.read_csv(os.path.join(data_dir, ratings_csv))
     print("Dataset ratings chargé")
     return data
 
-def read_movies(movies_csv: str, data_dir: str = "/home/antoine/Ml_Ops_Movies_Reco/src/data/data/raw") -> pd.DataFrame:
+def read_movies(movies_csv: str, data_dir: str = "/app/data/") -> pd.DataFrame:
     """Lit le fichier CSV contenant les informations sur les films."""
     df = pd.read_csv(os.path.join(data_dir, movies_csv))
     print("Dataset movies chargé")
+    return df
+
+def read_links(links_csv: str, data_dir: str = "/app/data/") -> pd.DataFrame:
+    """
+    Lit le fichier CSV contenant les informations sur les liens des affiches scrappés.
+
+    :param links_csv: Nom du fichier CSV contenant les liens des affiches.
+    :param data_dir: Répertoire où se trouve le fichier CSV.
+    :return: DataFrame contenant movieId et lien vers les affiches.
+    """
+    df = pd.read_csv(os.path.join(data_dir, links_csv))
+    df = df[['movieId', 'cover_link']]
+    print("Dataset links chargé")
     return df
 
 def train_model(df: pd.DataFrame) -> SVD:
     """Entraîne le modèle de recommandation sur les données fournies."""
     # Diviser les données en ensembles d'entraînement et de test
     reader = Reader(rating_scale=(0.5, 5))
-    data = Dataset.load_from_df(df[['userId', 'title', 'rating']], reader=reader)
+    data = Dataset.load_from_df(df[['userId', 'movieId', 'rating']], reader=reader)
 
     # Extraire le Trainset
     trainset = data.build_full_trainset()
@@ -82,9 +96,17 @@ if __name__ == "__main__":
     # Chargement des données
     ratings = read_ratings('ratings.csv')
     movies = read_movies('movies.csv')
-
+    links = read_links('links2.csv')
     df = pd.merge(ratings[['userId', 'movieId', 'rating']], movies[['movieId', 'title']], on='movieId', how='left')
-
+    df = df.merge(links, on = 'movieId', how = 'left')
+    user_encoder = LabelEncoder()
+    movie_encoder = LabelEncoder()
+    df['userId'] = user_encoder.fit_transform(df['userId'])
+    df['movieId'] = movie_encoder.fit_transform(df['movieId'])
+    df.to_csv('/app/data/preprocessing_df.csv')
+    # Sauvegarde du LabelEncoder dans un fichier
+    with open('/app/model/label_encoder.pkl', 'wb') as file:
+        pickle.dump(movie_encoder, file)
     # Entraînement du modèle et récupération de la moyenne des scores
     model, mean_rmse = train_model(df)
 
@@ -105,7 +127,7 @@ if __name__ == "__main__":
         new_version = current_version + 1
 
         # Sauvegarder le modèle avec la nouvelle version
-        save_model(model, "/home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/model/model_SVD.pkl", f"v{new_version}")
+        save_model(model, "app/model/model_SVD.pkl", f"v{new_version}")
 
         # Écrire la nouvelle version dans le fichier
         write_version(version_file_path, new_version)

@@ -5,7 +5,8 @@ services:
       context: ./model-trainer-predictor
       dockerfile: Dockerfile
     volumes:
-      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume:/app/data
+      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/raw:/app/data
+      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/model:/app/model
     container_name: model_trainer_predictor
 
   # Service pour MongoDB

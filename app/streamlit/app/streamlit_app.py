@@ -147,12 +147,13 @@ if st.session_state.is_logged_in:
           if submitted:
 
                # Envoyer la requête à l'API
-               req = requests.post("http://fastapi:8000/predict/", json={'user_id': user_id_input})
+               req = requests.post("http://fastapi:8000/predict/", json={'userId': user_id_input})
                result = req.json()
                # Affichage des meilleurs films de l'utilisateur
                st.write("Mes 5 films préférés:")
                if "best_user_movies" in result:
                     best_movies = result["best_user_movies"]
+                    print(best_movies)
 
                     # Créer des colonnes pour afficher les meilleurs films
                     cols_best_movies = st.columns(5)  # 5 colonnes pour les meilleurs films
@@ -160,20 +161,23 @@ if st.session_state.is_logged_in:
                     for i, movie in enumerate(best_movies):
                          col_index = i % 5  # Calculer l'index de colonne
                          with cols_best_movies[col_index]:  # Utiliser la colonne correspondante
+                              # Combiner le titre et les genres pour la légende
+                              caption = f"{movie['title']} - Genres: {movie['genres']}"
+                              st.image(movie["cover"], caption=caption, use_column_width=True)
+
+               # Affichage des recommandations de films
+               st.write("Voici les recommandations de films :")
+               if "recommendations" in result:
+                    recommended_movies = result["recommendations"]
+
+                    # Créer des colonnes pour afficher les recommandations
+                    cols_recommended_movies = st.columns(5)  # 5 colonnes pour les recommandations
+
+                    for i, movie in enumerate(recommended_movies):
+                         col_index = i % 5  # Calculer l'index de colonne
+                         with cols_recommended_movies[col_index]:
+                              caption = f"{movie['title']} - Genres: {movie['genres']}"
                               st.image(movie["cover"], caption=movie["title"], use_column_width=True)
-
-                    # Affichage des recommandations de films
-                    st.write("Voici les recommandations de films :")
-                    if "recommendations" in result:
-                         recommended_movies = result["recommendations"]
-
-                         # Créer des colonnes pour afficher les recommandations
-                         cols_recommended_movies = st.columns(5)  # 5 colonnes pour les recommandations
-
-                         for i, movie in enumerate(recommended_movies):
-                              col_index = i % 5  # Calculer l'index de colonne
-                              with cols_recommended_movies[col_index]:  # Utiliser la colonne correspondante
-                                   st.image(movie["cover"], caption=movie["title"], use_column_width=True)
 
      elif page == pages[5]:
           st.header("Page 5")
