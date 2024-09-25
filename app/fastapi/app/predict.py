@@ -2,21 +2,29 @@ import pandas as pd
 import os
 import json
 import pickle
-from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
+from scipy.sparse import csr_matrix
+from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+from fuzzywuzzy import process
+from sklearn.decomposition import TruncatedSVD
 from fastapi import Request, APIRouter, HTTPException
 from typing import List, Dict, Any
 from prometheus_client import Counter, Histogram, CollectorRegistry
 import time
 from pydantic import BaseModel
-from surprise.prediction_algorithms.matrix_factorization import SVD
-from sklearn.preprocessing import LabelEncoder
 import re
 
-# Création d'un routeur pour gérer les routes de prédiction
+# ROUTEUR POUR GERER LES ROUTES PREDICT
+
 router = APIRouter(
     prefix='/predict',  # Préfixe pour toutes les routes dans ce routeur
     tags=['predict']    # Tag pour la documentation
 )
+
+# ---------------------------------------------------------------
+
+# ENSEMBLE DES FONCTIONS UTILISEES
 
 def read_ratings(ratings_csv: str, data_dir: str = "/app/raw") -> pd.DataFrame:
     """
@@ -55,114 +63,129 @@ def read_links(links_csv: str, data_dir: str = "/app/raw") -> pd.DataFrame:
     print("Dataset links chargé")
     return df
 
-# Récupération des films les mieux notés par l'utilisateur
-def best_user_movies(df, user_id, n =5):
-    top_user_movies = (df[df['userId'] == user_id].sort_values(by='rating', ascending=False))[:n]
-    top_title = list(top_user_movies['title'])
-    top_cover = list(top_user_movies['cover_link'])
-    top_genres = list(top_user_movies['genres'])
-    return top_title, top_cover, top_genres
-
 # Chargement du dernier modèle
-def load_latest_model(directory = "/app/model") -> SVD:
+def load_model(directory = "/app/model") :
     """Charge le modèle avec la dernière version à partir d'un répertoire."""
     # Vérifier si le répertoire existe
     if not os.path.exists(directory):
         raise FileNotFoundError(f"Le répertoire {directory} n'existe pas.")
     # Liste des fichiers dans le répertoire
     files = os.listdir(directory)
-    # Filtrer les fichiers pour ne garder que ceux qui correspondent au modèle SVD
-    model_files = [f for f in files if f.startswith("model_SVD") and f.endswith(".pkl")]
+    # Filtrer les fichiers pour ne garder que ceux qui correspondent au modèle knn
+    model_files = [f for f in files if f.startswith("model_knn") and f.endswith(".pkl")]
     if not model_files:
-        raise FileNotFoundError("Aucun modèle SVD trouvé dans le répertoire.")
-    # Extraire les numéros de version et trouver le fichier avec la plus grande version
-    versioned_files = {}
-    for model_file in model_files:
-        # Utiliser une expression régulière pour extraire la version du nom de fichier
-        match = re.search(r'_(v\d+)', model_file)
-        if match:
-            version = match.group(1)  # Récupérer la version (ex: v1)
-            versioned_files[version] = model_file
-    # Trier les versions pour obtenir la dernière
-    latest_version = sorted(versioned_files.keys(), key=lambda x: int(x[1:]))[-1]
-    latest_model_file = versioned_files[latest_version]
+        raise FileNotFoundError("Aucun modèle KNN trouvé dans le répertoire.")
     # Charger le modèle
-    filepath = os.path.join(directory, latest_model_file)
+    filepath = os.path.join(directory, model_files)
     with open(filepath, 'rb') as file:
         model = pickle.load(file)
-        print(f'Modèle chargé depuis {filepath} (version {latest_version})')
+        print(f'Modèle chargé depuis {filepath}')
     return model
 
-def preprocess_data():
-    # Chargement des données
-    ratings = read_ratings('ratings.csv')
-    movies = read_movies('movies.csv')
-    links = read_links('links2.csv')
-    print("Encodage en cours")
-    df = pd.merge(ratings, movies[['movieId', 'title', 'genres']], on = 'movieId', how = 'left')
-    df = df.merge(links, on = 'movieId', how= 'left')
-    user_encoder = LabelEncoder()
-    movie_encoder = LabelEncoder()
-    df['userId'] = user_encoder.fit_transform(df['userId'])
-    df['movieId'] = movie_encoder.fit_transform(df['movieId'])
-    return df, movie_encoder, movies, links
-
-# Chargement des données preprocessé
-df, movie_encoder, movies, links = preprocess_data()
-model_svd = load_latest_model()
-
-
-def get_top_n_recommendations(user_id: int, n: int = 10) -> List[str]:
+def create_X(df):
     """
-    Récupère les n meilleures recommandations de films pour un utilisateur donné.
+    Génère une matrice creuse avec quatre dictionnaires de mappage
+    - user_mapper: mappe l'ID utilisateur à l'index utilisateur
+    - movie_mapper: mappe l'ID du film à l'index du film
+    - user_inv_mapper: mappe l'index utilisateur à l'ID utilisateur
+    - movie_inv_mapper: mappe l'index du film à l'ID du film
+    Args:
+        df: pandas dataframe contenant 3 colonnes (userId, movieId, rating)
 
-    :param user_id: L'identifiant de l'utilisateur pour lequel faire des recommandations.
-    :param n: Le nombre de recommandations à retourner (par défaut 10).
-    :return: Une liste des titres de films recommandés.
+    Returns:
+        X: sparse matrix
+        user_mapper: dict that maps user id's to user indices
+        user_inv_mapper: dict that maps user indices to user id's
+        movie_mapper: dict that maps movie id's to movie indices
+        movie_inv_mapper: dict that maps movie indices to movie id's
     """
-    # Obtenir les films déjà notés par l'utilisateur
-    user_movies = df[df['userId'] == user_id]['title'].unique()
+    M = df['userId'].nunique()
+    N = df['movieId'].nunique()
 
-    # Obtenir les films déjà notés par l'utilisateur
-    user_movies = df[df['userId'] == user_id]['movieId'].unique()
+    user_mapper = dict(zip(np.unique(df["userId"]), list(range(M))))
+    movie_mapper = dict(zip(np.unique(df["movieId"]), list(range(N))))
 
-    # Obtenir tous les titres de films
-    all_movies = df['movieId'].unique()
+    user_inv_mapper = dict(zip(list(range(M)), np.unique(df["userId"])))
+    movie_inv_mapper = dict(zip(list(range(N)), np.unique(df["movieId"])))
 
-    # Identifier les films qui n'ont pas été notés par l'utilisateur
-    movies_to_predict = list(set(all_movies) - set(user_movies))
+    user_index = [user_mapper[i] for i in df['userId']]
+    item_index = [movie_mapper[i] for i in df['movieId']]
 
-    # Créer des paires utilisateur-titre pour prédiction
-    user_movie_pairs = [(user_id, movie_id, 0) for movie_id in movies_to_predict]
+    X = csr_matrix((df["rating"], (user_index,item_index)), shape=(M,N))
 
-    # Prédictions avec le modèle SVD
-    predictions_cf = []
+    return X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper
 
-    for user_id, title, _ in user_movie_pairs:
-        movie_id = df[df['title'] == title]['movieId'].values[0]  # Récupérer movieId à partir du titre
-        predicted_rating = model_svd.predict(user_id, movie_id).est  # Utiliser predict avec movieId
-        predictions_cf.append((title, predicted_rating))
+# Predictions si utilisateur connu
+def find_similar_movies(movie_id, X, movie_mapper, movie_inv_mapper, metric='cosine', k=10):
+    """
+    Trouve les k voisins les plus proches pour un ID de film donné.
 
-    top_n_recommendations = sorted(predictions_cf, key = lambda x: x.est)[:n]
+    Args:
+        movie_id: ID du film d'intérêt
+        X: matrice d'utilité utilisateur-article (matrice creuse)
+        k: nombre de films similaires à récupérer
+        metric: métrique de distance pour les calculs kNN
 
-    for pred in top_n_recommendations:
-        predicted_rating = pred.est
+    Output: retourne une liste des k ID de films similaires
+    """
+    # Transposer la matrice X pour que les films soient en lignes et les utilisateurs en colonnes
+    X = X.T
+    neighbour_ids = []  # Liste pour stocker les ID des films similaires
 
-    # Extraire seulement les titres des films recommandés
-    top_n_movies = [title for title, _ in top_n_recommendations]
+    # Obtenir l'index du film à partir du mapper
+    movie_ind = movie_mapper[movie_id]
 
-    top_n_movies = movie_encoder.inverse_transform(top_n_movie_ids)
-    print({"top 10 movieId" : top_n_movies})
-    return top_n_movies
+    # Extraire le vecteur correspondant au film spécifié
+    movie_vec = X[movie_ind]
+
+    # Vérifier si movie_vec est un tableau NumPy et le remodeler en 2D si nécessaire
+    if isinstance(movie_vec, (np.ndarray)):
+        movie_vec = movie_vec.reshape(1, -1)  # Reshape pour avoir une forme (1, n_features)
+
+    # Initialiser NearestNeighbors avec k+1 car nous voulons inclure le film lui-même dans les voisins
+    kNN = NearestNeighbors(n_neighbors=k + 1, algorithm="brute", metric=metric)
+
+    # Ajuster le modèle sur la matrice transposée (films comme lignes)
+    kNN.fit(X)
+
+    # Trouver les k+1 voisins les plus proches (y compris le film d'intérêt)
+    neighbour = kNN.kneighbors(movie_vec, return_distance=False)
+
+    # Collecter les ID des films parmi les voisins trouvés
+    for i in range(0, k):  # Boucler jusqu'à k pour obtenir seulement les films similaires
+        n = neighbour.item(i)  # Obtenir l'index du voisin
+        neighbour_ids.append(movie_inv_mapper[n])  # Mapper l'index à l'ID du film
+
+    neighbour_ids.pop(0)  # Retirer le premier élément qui est l'ID du film original
+
+    return neighbour_ids  # Retourner la liste des ID de films similaires
+
+# Focntion qui regroupe les recommandations
+def get_content_based_recommendations(title_string, n_recommendations=10):
+    title = movie_finder(title_string)
+    idx = movie_idx[title]
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = sim_scores[1:(n_recommendations+1)]
+    similar_movies = [i[0] for i in sim_scores]
+    print(f"Because you watched {title}:")
+    print(movies['title'].iloc[similar_movies])
 
 def validate_userId(userId):
     # Vérifier si userId est dans la plage valide
     if userId < 1 or userId > 138493:
         return "Le numéro d'utilisateur doit être compris entre 1 et 138493."
-
     return None
 
-# Metrics à surveiller avec prometheus
+def movie_finder(title):
+    all_titles = movies['title'].tolist()
+    closest_match = process.extractOne(title,all_titles)
+    return closest_match[0]
+
+# ---------------------------------------------------------------
+
+# METRICS PROMETHEUS
+
 collector = CollectorRegistry()
 # Nbre de requête
 nb_of_requests_counter = Counter(
@@ -194,6 +217,28 @@ error_counter = Counter(
     documentation='Count of API errors by type',
     labelnames=['error_type'],
     registry=collector)
+
+# ---------------------------------------------------------------
+
+# CHARGEMENT DES DONNEES AU DEMARRAGE DE API
+
+ratings = read_ratings('ratings.csv')
+movies = read_movies('movies.csv')
+links = read_links('links2.csv')
+model_svd = load_model()
+X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper = create_X(ratings)
+svd = TruncatedSVD(n_components=20, n_iter=10)
+Q = svd.fit_transform(X.T)
+Z = Q.T
+genres = set(g for G in movies['genres'] for g in G)
+for g in genres:
+    movies[g] = movies.genres.transform(lambda x: int(g in x))
+movie_genres = movies.drop(columns=['movieId', 'title','genres'])
+movie_idx = dict(zip(movies['title'], list(movies.index)))
+cosine_sim = cosine_similarity(movie_genres, movie_genres)
+print(f"Dimensions of our genres cosine similarity matrix: {cosine_sim.shape}")
+
+# ---------------------------------------------------------------
 
 # Modèle Pydantic pour la récupération de l'user_id lié aux films
 class MovieUserId(BaseModel):

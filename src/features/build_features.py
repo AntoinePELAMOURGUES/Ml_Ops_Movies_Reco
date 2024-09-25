@@ -3,7 +3,7 @@ from sklearn.preprocessing import LabelEncoder
 import os
 
 
-def read_ratings(ratings_csv, data_dir="data/raw") -> pd.DataFrame:
+def read_ratings(ratings_csv, data_dir="/home/antoine/Ml_Ops_Movies_Reco/src/data/data/raw") -> pd.DataFrame:
     """
     Reads a ratings.csv from the data/raw folder.
 
@@ -25,7 +25,7 @@ def read_ratings(ratings_csv, data_dir="data/raw") -> pd.DataFrame:
     return data
 
 
-def read_movies(movies_csv, data_dir="data/raw") -> pd.DataFrame:
+def read_movies(movies_csv, data_dir="/home/antoine/Ml_Ops_Movies_Reco/src/data/data/raw") -> pd.DataFrame:
     """
     Reads a movies.csv from the data/raw folder.
 
@@ -74,5 +74,5 @@ if __name__ == "__main__":
     movies = read_movies("movies.csv")
     user_matrix = create_user_matrix(user_ratings, movies)
     movies = movies.drop("title", axis=1)
-    movies.to_csv("data/processed/movie_matrix.csv", index=False)
-    user_matrix.to_csv("data/processed/user_matrix.csv")
+    movies.to_csv("/home/antoine/Ml_Ops_Movies_Reco/src/data/data/processed/movie_matrix.csv", index=False)
+    user_matrix.to_csv("/home/antoine/Ml_Ops_Movies_Reco/src/data/data/processed/user_matrix.csv")
