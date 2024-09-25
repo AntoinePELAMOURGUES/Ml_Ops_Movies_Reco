@@ -38,7 +38,34 @@ if 'is_logged_in' not in st.session_state:
 
 if page == pages[0]:
 
-     st.write("Page 1")
+     st.header("Bienvenue sur notre site de recommandation de films")
+
+     logo = "netflix-catalogue.jpg"
+
+     # Affichage de l'image en haut de la page
+     st.image(logo)
+
+     st.header("Possédez-vous un numéro d'utilisateur ?")
+
+     yes = st.button("Oui")
+     no = st.button("Non")
+
+     if yes:
+          st.write("Parfait 💪. Vos recommandations seront personnalisées")
+          with st.form("user_info"):
+               st.write("Renseignez votre n° d'utilisateur")
+               user_id_input = st.number_input("Numéro utilisateur", min_value=1, step=1, format="%d")
+               st.write("Indiquez le titre du film sur lequel faire nos recommandations")
+               title = st.text_input("Film")
+               submitted = st.form_submit_button("Soumettre")
+     if no:
+          st.write("Dommage 😢. Rien de grave, nous arriverons à vous recommander de très bon films malgré tout. Mais pour garantir de meilleures recommandations, n'hésitez pas à vous inscrire pour noter vos films 😊")
+          with st.form("user_info"):
+               st.write("Indiquez le titre du film sur lequel faire nos recommandations")
+               title = st.text_input("Film")
+               submitted = st.form_submit_button("Soumettre")
+
+
 
 elif page == pages[1]:
 
