@@ -16,20 +16,34 @@ with st.form("user_info_no", clear_on_submit=True):
         json={"movie_title": title}
         )
 
+        # Vérifier la réponse
         if response.status_code == 200:
             result = response.json()
             st.write("Film sélectionné :")
             user_choice = result['user_choice']
             caption = f"{user_choice['title']}"
-            st.image(user_choice["cover"], caption=caption)
+            st.image(user_choice["cover"], caption=caption, width=180)
             st.write("Nos 10 recommandations :")
             recommended_movies = result['recommendations']
 
+            # Créer des colonnes pour afficher les 5 premières recommandations
             cols_recommended_movies = st.columns(5)
-            for i, movie in enumerate(recommended_movies):
+            for i, movie in enumerate(recommended_movies[:5]):
                 col_index = i % 5
                 with cols_recommended_movies[col_index]:
-                        caption = f"{movie['title']}"
-                        st.image(movie["cover"], caption=caption, use_column_width=True)
+                    caption = f"{movie['title']}"
+                    st.image(movie["cover"], caption=caption, use_column_width=True)
+
+            # Ajouter une ligne horizontale
+            st.markdown("---")
+
+            # Créer des colonnes pour afficher les 5 suivantes recommandations
+            cols_recommended_movies_second_half = st.columns(5)
+            for i, movie in enumerate(recommended_movies[5:10]):
+                col_index = i % 5
+                with cols_recommended_movies_second_half[col_index]:
+                    caption = f"{movie['title']}"
+                    st.image(movie["cover"], caption=caption, use_column_width=True)
+
         else:
             st.error(f"Erreur lors de la requête : {response.status_code} - {response.text}")

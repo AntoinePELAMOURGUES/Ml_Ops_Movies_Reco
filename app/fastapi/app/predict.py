@@ -6,7 +6,7 @@ from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-from fuzzywuzzy import process
+from rapidfuzz import process, fuzz, utils
 from sklearn.decomposition import TruncatedSVD
 from fastapi import Request, APIRouter, HTTPException
 from typing import List, Dict, Any, Optional

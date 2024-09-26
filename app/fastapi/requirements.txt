@@ -12,6 +12,6 @@ prometheus-fastapi-instrumentator
 requests
 Pillow
 matplotlib
-fuzzywuzzy
+rapidfuzz
 scipy
 

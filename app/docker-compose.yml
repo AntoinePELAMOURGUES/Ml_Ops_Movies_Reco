@@ -73,6 +73,7 @@ services:
     image: prom/prometheus:latest
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/logs/prometheus:/var/log/prometheus # Volume pour logs Prometheus
     ports:
       - "9090:9090"
     container_name: prometheus
@@ -84,6 +85,8 @@ services:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
+    volumes:
+      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/logs/grafana:/var/lib/grafana/logs
     container_name: grafana
     networks:
       - app

@@ -62,7 +62,6 @@ with st.form("connexion_form", clear_on_submit=True):
             st.success(f"Connexion réussie ! Bienvenue {username}. Vous pouvez maintenant poursuivre sur les prochaines pages.")
             st.balloons()
             st.session_state.is_logged_in = True
-            st.experimental_rerun()
         else:
             # Erreur d'utilisateur déjà enregistré
             error_message = response.json().get("detail", "Une erreur est survenue.")

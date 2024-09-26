@@ -17,7 +17,14 @@ st.markdown("<h1 style='text-align: center;'>PROJET ML_Ops</h1>", unsafe_allow_h
 st.markdown("<h2 style='text-align: center;'>RECOMMANDATION DE FILMS</h2>", unsafe_allow_html=True)
 
 st.markdown('---')
-st.image("/app/images/datascientest.png", width = 600 )
+st.markdown(
+    f"""
+    <div style="display: flex; justify-content: center;">
+        <img src="/app/images/datascientest.png" width="500">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # Création et mise en forme de notre Sidebar
 
