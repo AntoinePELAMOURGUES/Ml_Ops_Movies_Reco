@@ -312,7 +312,7 @@ async def predict(user_request: UserRequest) -> Dict[str, Any]:
     duration = time.time() - start_time
     # Enregistrement des métriques pour Prometheus
     status_code_counter.labels(status_code="200").inc()  # Compter les réponses réussies
-    duration_of_requests_histogram.labels(method='POST', endpoint='/new_user').observe(duration)  # Enregistrer la durée de la requête
+    duration_of_requests_histogram.labels(method='POST', endpoint='/new_user', user_id= None).observe(duration)  # Enregistrer la durée de la requête
     response_size_histogram.labels(method='POST', endpoint='/new_user').observe(response_size)  # Enregistrer la taille de la réponse
     print({"result_request_fastapi": result})  # Afficher le résultat dans la console pour le débogage
     return result
