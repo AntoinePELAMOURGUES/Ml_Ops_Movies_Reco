@@ -20,4 +20,4 @@ EXPOSE 8501
 ENTRYPOINT ["streamlit", "run"]
 
 # Spécifier le script à exécuter
-CMD ["streamlit_app.py"]
+CMD ["app.py"]

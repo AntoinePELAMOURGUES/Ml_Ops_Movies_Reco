@@ -9,7 +9,7 @@ import numpy as np
 from fuzzywuzzy import process
 from sklearn.decomposition import TruncatedSVD
 from fastapi import Request, APIRouter, HTTPException
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from prometheus_client import Counter, Histogram, CollectorRegistry
 import time
 from pydantic import BaseModel
@@ -67,18 +67,12 @@ def read_links(links_csv: str, data_dir: str = "/app/raw") -> pd.DataFrame:
 
 # Chargement du dernier modèle
 def load_model(directory = "/app/model") :
-    """Charge le modèle avec la dernière version à partir d'un répertoire."""
+    """Charge le modèle à partir d'un répertoire."""
     # Vérifier si le répertoire existe
     if not os.path.exists(directory):
         raise FileNotFoundError(f"Le répertoire {directory} n'existe pas.")
-    # Liste des fichiers dans le répertoire
-    files = os.listdir(directory)
-    # Filtrer les fichiers pour ne garder que ceux qui correspondent au modèle knn
-    model_files = [f for f in files if f.startswith("model_knn") and f.endswith(".pkl")]
-    if not model_files:
-        raise FileNotFoundError("Aucun modèle KNN trouvé dans le répertoire.")
     # Charger le modèle
-    filepath = os.path.join(directory, model_files)
+    filepath = os.path.join(directory, 'model_knn.pkl')
     with open(filepath, 'rb') as file:
         model = pickle.load(file)
         print(f'Modèle chargé depuis {filepath}')
@@ -120,7 +114,7 @@ def create_X(df):
     return X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper
 
 # Predictions si utilisateur connu
-def find_similar_movies(movie_id, X, movie_mapper, movie_inv_mapper, metric='cosine', k=10):
+def find_similar_movies(movie_id, X, movie_mapper, movie_inv_mapper, model, k=11):
     """
     Trouve les k voisins les plus proches pour un ID de film donné.
     Args:
@@ -141,8 +135,10 @@ def find_similar_movies(movie_id, X, movie_mapper, movie_inv_mapper, metric='cos
     if isinstance(movie_vec, (np.ndarray)):
         movie_vec = movie_vec.reshape(1, -1)  # Reshape pour avoir une forme (1, n_features)
     # Chargement du modèle
-    kNN = model_knn
+    kNN = model
     # Trouver les k+1 voisins les plus proches (y compris le film d'intérêt)
+    kNN.fit(X)
+
     neighbour = kNN.kneighbors(movie_vec, return_distance=False)
     # Collecter les ID des films parmi les voisins trouvés
     for i in range(0, k):  # Boucler jusqu'à k pour obtenir seulement les films similaires
@@ -236,7 +232,7 @@ print("FIN DES CHARGEMENTS")
 
 # Modèle Pydantic pour la récupération de l'user_id lié aux films
 class UserRequest(BaseModel):
-    userId : int  # Nom d'utilisateur
+    userId: Optional[int] = None  # Nom d'utilisateur
     movie_title : str # Nom du film
 
 # Route API concernant les utilisateurs déjà identifiés
@@ -253,6 +249,7 @@ async def predict(user_request: UserRequest) -> Dict[str, Any]:
     # Incrémenter le compteur de requêtes pour prometheus
     nb_of_requests_counter.labels(method='POST', endpoint='/identified_user').inc()
     # Récupération des données Streamlit
+    print({"user_request" : user_request})
     movie_title = movie_finder(user_request.movie_title)  # Trouver le titre du film correspondant
     user_id = user_request.userId  # Récupérer l'ID utilisateur depuis la requête
     # Validation de l'ID utilisateur
@@ -263,13 +260,13 @@ async def predict(user_request: UserRequest) -> Dict[str, Any]:
     # Récupération de l'ID du film à partir du titre
     movie_id = int(movies['movieId'][movies['title'] == movie_title].iloc[0])
     # Récupérer les ID des films recommandés en utilisant la fonction de similarité
-    similar_movies = find_similar_movies(movie_id, Q.T, movie_mapper, movie_inv_mapper, metric='cosine', k=10)
+    similar_movies = find_similar_movies(movie_id, Q.T, movie_mapper, movie_inv_mapper, model = model_knn, k=11)
     # Obtenir le titre et la couverture du film choisi par l'utilisateur
     movie_title = movie_titles[movie_id]
     movie_cover = movie_covers[movie_id]
     # Créer un dictionnaire pour stocker les titres et les couvertures des films recommandés
     result = {
-        "user_choice": [{"title": movie_title, "cover": movie_cover}],
+        "user_choice": {"title": movie_title, "cover": movie_cover},
         "recommendations": [{"title": movie_titles[i], "cover": movie_covers[i]} for i in similar_movies]
     }
     # Mesurer la taille de la réponse et l'enregistrer
@@ -306,7 +303,7 @@ async def predict(user_request: UserRequest) -> Dict[str, Any]:
     movie_cover = movie_covers[movie_id]
     # Créer un dictionnaire pour stocker les titres et les couvertures des films recommandés
     result = {
-        "user_choice": [{"title": movie_title, "cover": movie_cover}],
+        "user_choice": {"title": movie_title, "cover": movie_cover},
         "recommendations": [{"title": movie_titles[i], "cover": movie_covers[i]} for i in similar_movies]
     }
     # Mesurer la taille de la réponse et l'enregistrer

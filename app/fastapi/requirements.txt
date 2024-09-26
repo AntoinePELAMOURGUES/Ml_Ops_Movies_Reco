@@ -5,7 +5,7 @@ passlib[bcrypt]
 python-multipart
 sqlalchemy
 numpy<2.0
-scikit-learn
+scikit-learn==1.5.1
 pandas
 prometheus-client
 prometheus-fastapi-instrumentator
