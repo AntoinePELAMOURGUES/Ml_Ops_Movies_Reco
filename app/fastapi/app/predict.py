@@ -154,7 +154,7 @@ def get_content_based_recommendations(title, n_recommendations=10):
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
     sim_scores = sim_scores[1:(n_recommendations+1)]
     similar_movies = [i[0] for i in sim_scores]
-    return similar_movies
+    return similar_movies # return les index des films similaires
 
 # Validation de l'utilisateur
 def validate_userId(userId):
@@ -168,6 +168,12 @@ def movie_finder(title):
     all_titles = movies['title'].tolist()
     closest_match = process.extractOne(title,all_titles)
     return closest_match[0]
+
+# retourne la clé associée à une valeur donnée
+def find_key(value, dictionary):
+    for key, val in dictionary.items():
+        if val == value:
+            return key
 
 # ---------------------------------------------------------------
 
@@ -209,22 +215,40 @@ error_counter = Counter(
 
 # CHARGEMENT DES DONNEES AU DEMARRAGE DE API
 print("DEBUT DES CHARGEMENTS")
+# Lecture des fichiers CSV contenant les données
 ratings = read_ratings('ratings.csv')
 movies = read_movies('movies.csv')
+# Convertit la chaîne de genres en liste en séparant par '|'
+movies['genres'] = movies['genres'].apply(lambda x: x.split("|"))
+# Charge les liens vers les couvertures des films
 links = read_links('links2.csv')
+# Merge de movies et links pour avoir un ix commun
+movies_links_df = movies.merge(links, on = "movieId", how = 'left')
+# Chargement d'un modèle KNN (K-Nearest Neighbors) pré-entraîné pour les recommandations
 model_knn = load_model()
+# Création de la matrice X et des mappers pour les utilisateurs et les films
 X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper = create_X(ratings)
+# Décomposition en valeurs singulières (SVD) pour la réduction de dimensionnalité
 svd = TruncatedSVD(n_components=20, n_iter=10)
+# Applique SVD à la transposée de la matrice X pour obtenir la matrice réduite Q
 Q = svd.fit_transform(X.T)
+# Création d'une représentation binaire des genres pour chaque film
 genres = set(g for G in movies['genres'] for g in G)
 for g in genres:
+    # Ajoute une colonne binaire pour chaque genre (1 si présent, sinon 0)
     movies[g] = movies.genres.transform(lambda x: int(g in x))
-movie_genres = movies.drop(columns=['movieId', 'title','genres'])
+# Préparation d'une matrice contenant uniquement les colonnes de genres, sans ID et titre
+movie_genres = movies.drop(columns=['movieId', 'title', 'genres'])
+# Création de dictionnaires pour faciliter l'accès aux titres et aux couvertures des films par leur ID
 movie_idx = dict(zip(movies['title'], list(movies.index)))
+cover_idx = dict(zip(movies_links_df['cover_link'], list(movies_links_df.index)))
+# Calcul de la similarité cosinus entre les genres des films
 cosine_sim = cosine_similarity(movie_genres, movie_genres)
 print(f"Dimensions of our genres cosine similarity matrix: {cosine_sim.shape}")
+# Création de dictionnaires pour accéder facilement aux titres et aux couvertures des films par leur ID
 movie_titles = dict(zip(movies['movieId'], movies['title']))
 movie_covers = dict(zip(links['movieId'], links['cover_link']))
+
 print("FIN DES CHARGEMENTS")
 # ---------------------------------------------------------------
 
@@ -304,7 +328,8 @@ async def predict(user_request: UserRequest) -> Dict[str, Any]:
     # Créer un dictionnaire pour stocker les titres et les couvertures des films recommandés
     result = {
         "user_choice": {"title": movie_title, "cover": movie_cover},
-        "recommendations": [{"title": movie_titles[i], "cover": movie_covers[i]} for i in similar_movies]
+        "recommendations": [{"title": find_key(i, movie_idx), "cover": find_key(i, cover_idx)} for i in similar_movies]
+
     }
     # Mesurer la taille de la réponse et l'enregistrer
     response_size = len(json.dumps(result))
