@@ -1,19 +1,19 @@
+version: '3.9'
+
 services:
-  # Service pour le prétraitement et l'entraînement avec la bibliothèque Surprise
   model-trainer-predictor:
     build:
       context: ./model-trainer-predictor
       dockerfile: Dockerfile
     volumes:
-      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/raw:/app/data
-      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/model:/app/model
+      - shared_raw:/app/data
+      - shared_model:/app/model
     container_name: model_trainer_predictor
 
-  # Service pour MongoDB
   mongodb:
     image: mongo:latest
     volumes:
-      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/mongodb_data:/data/db
+      - mongodb_data:/data/db
     ports:
       - "27017:27017"
     environment:
@@ -23,7 +23,6 @@ services:
     networks:
       - app
 
-  # Service pour FastAPI
   fastapi:
     build:
       context: ./fastapi
@@ -32,16 +31,16 @@ services:
       - .env
     volumes:
       - ./fastapi/app:/app
-      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/raw:/app/raw
-      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/model:/app/model
-      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/user_db:/app/user_db
+      - shared_raw:/app/raw
+      - shared_model:/app/model
+      - shared_user_db:/app/user_db
     ports:
       - "8000:8000"
     restart: always
     networks:
       - app
     container_name: fastapi
-  # Service pour Streamlit
+
   streamlit:
     build:
       context: ./streamlit
@@ -54,39 +53,28 @@ services:
     depends_on:
       - fastapi
     container_name: streamlit
-    # Service pour Airflow
-    # airflow:
-    #   image: apache/airflow:2.3.0
-    #   environment:
-    #     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-    #     - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////root/airflow.db
-    #   volumes:
-    #     - ./shared_volume/dags:/opt/airflow/dags
-    #   ports:
-    #     - "8080:8080"
-    #   container_name: airflow
-    #   networks:
-    #   - app
 
-    # Service pour Prometheus
   prometheus:
     image: prom/prometheus:latest
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/logs/prometheus:/var/log/prometheus # Volume pour logs Prometheus
+      - shared_prometheus:/var/log/prometheus # Volume pour logs Prometheus
     ports:
       - "9090:9090"
     container_name: prometheus
     networks:
       - app
 
-  # Service pour Grafana
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana-enterprise
+    restart: unless-stopped
+    environment:
+     - GF_SERVER_ROOT_URL=http://my.grafana.server/
+     - GF_INSTALL_PLUGINS=grafana-clock-panel
     ports:
       - "3000:3000"
     volumes:
-      - /home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/logs/grafana:/var/lib/grafana/logs
+      - grafana_data:/var/lib/grafana
     container_name: grafana
     networks:
       - app
@@ -103,3 +91,11 @@ services:
 networks:
   app:
     driver: bridge
+
+volumes:
+  shared_raw:
+  shared_model:
+  mongodb_data:
+  shared_user_db:
+  shared_prometheus:
+  grafana_data:

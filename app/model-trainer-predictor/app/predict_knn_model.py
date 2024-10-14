@@ -7,13 +7,13 @@ from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 
 
-def read_ratings(ratings_csv: str, data_dir: str = "/home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/raw") -> pd.DataFrame:
+def read_ratings(ratings_csv: str, data_dir: str = "/app/data") -> pd.DataFrame:
     """Lit le fichier CSV contenant les évaluations des films."""
     data = pd.read_csv(os.path.join(data_dir, ratings_csv))
     print("Dataset ratings chargé")
     return data
 
-def read_movies(movies_csv: str, data_dir: str = "/home/antoine/Ml_Ops_Movies_Reco/app/shared_volume/raw") -> pd.DataFrame:
+def read_movies(movies_csv: str, data_dir: str = "/app/data") -> pd.DataFrame:
     """Lit le fichier CSV contenant les informations sur les films."""
     df = pd.read_csv(os.path.join(data_dir, movies_csv))
     print("Dataset movies chargé")
@@ -86,4 +86,4 @@ if __name__ == "__main__":
     movies = read_movies('movies.csv')
     X = create_X(ratings)
     model_knn = train_model(X)
-    save_model(model_knn, '/home/antoine/Ml_Ops_Movies_Reco/app/model-trainer-predictor/app/app/model/')
+    save_model(model_knn, '/app/model')
