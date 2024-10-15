@@ -1,93 +1,56 @@
-Project Name
-==============================
+# Introduction
 
-This project is a starting Pack for MLOps projects based on the subject "movie_recommandation". It's not perfect so feel free to make some modifications on it.
+Dans le cadre de notre formation en Machine Learning Operations (MLOps) dispensée par Datascientest, nous avons l'opportunité d'explorer la mise en production et le monitoring d'une API dédiée à la recommandation de films. Ce projet vise à allier théorie et pratique en développant une solution robuste qui non seulement prédit les films susceptibles d'intéresser les utilisateurs, mais assure également un suivi constant de la performance de l'API.
 
-Project Organization
-------------
+## Objectifs du Projet
 
-    ├── LICENSE
-    ├── README.md          <- The top-level README for developers using this project.
-    ├── data
-    │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
-    │
-    ├── logs               <- Logs from training and predicting
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-    │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures        <- Generated graphics and figures to be used in reporting
-    │
-    ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-    │                         generated with `pip freeze > requirements.txt`
-    │
-    ├── src                <- Source code for use in this project.
-    │   ├── __init__.py    <- Makes src a Python module
-    │   │
-    │   ├── data           <- Scripts to download or generate data
-    │   │   ├── check_structure.py    
-    │   │   ├── import_raw_data.py 
-    │   │   └── make_dataset.py
-    │   │
-    │   ├── features       <- Scripts to turn raw data into features for modeling
-    │   │   └── build_features.py
-    │   │
-    │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
-    │   │
-    │   ├── visualization  <- Scripts to create exploratory and results oriented visualizations
-    │   │   └── visualize.py
-    │   └── config         <- Describe the parameters used in train_model.py and predict_model.py
+- **Développement d'une API Performante** : Créer une API capable de fournir des recommandations de films basées sur des données utilisateurs et des modèles d'apprentissage automatique.
+- **Mise en Production** : Déployer l'API dans un environnement de production pour garantir son accessibilité et sa fiabilité.
+- **Monitoring Efficace** : Mettre en place des outils de surveillance pour suivre la disponibilité, les performances et les éventuelles erreurs de l'API, assurant ainsi une expérience utilisateur optimale.
 
---------
+## Pourquoi ce Projet ?
 
-## Steps to follow 
+Avec l'essor des services de streaming et la demande croissante pour des recommandations personnalisées, ce projet s'inscrit dans une tendance actuelle du marché. En intégrant des pratiques de MLOps, nous visons à garantir que notre solution soit non seulement fonctionnelle, mais aussi scalable et maintenable. Le monitoring joue un rôle crucial dans cette démarche, permettant d'anticiper les problèmes avant qu'ils n'affectent l'utilisateur final.
 
-Convention : All python scripts must be run from the root specifying the relative file path.
+Ce repository est donc un témoignage de notre apprentissage et de notre capacité à développer des solutions innovantes dans le domaine du Machine Learning et des API. Nous vous invitons à explorer le code, à tester l'API et à contribuer à son amélioration.
 
-### 1- Create a virtual environment using Virtualenv.
+## Organisation du projet
 
-    `python -m venv my_env`
+---
 
-###   Activate it 
+├── LICENSE
+├── README.md
+├── app # Dossier principal contenant les différentes applications
+│ ├── docker-compose.yml # Fichier de configuration pour Docker Compose
+│ ├── fastapi # Dossier pour l'application FastAPI
+│ │ ├── Dockerfile # Fichier pour construire l'image Docker de l'application FastAPI
+│ │ ├── app # Dossier contenant le code source de l'application FastAPI
+│ │ │ ├── README.md
+│ │ │ ├── auth.py # Module pour la gestion de l'authentification
+│ │ │ ├── database.py # Module pour la gestion de la base de données
+│ │ │ ├── main.py # Point d'entrée principal de l'application FastAPI
+│ │ │ ├── model
+│ │ │ ├── models.py # Modèle pour classe user
+│ │ │ ├── predict.py # Module pour la gestion des recommandations
+│ │ │ ├── raw # Dossier pour les données brutes utilisées par l'application
+│ │ └── requirements.txt # Liste des dépendances Python nécessaires pour FastAPI
+│ ├── model-trainer-predictor # Dossier pour le module d'entraînement et de prédiction du modèle
+│ │ ├── Dockerfile # Fichier pour construire l'image Docker du modèle KNN
+│ │ ├── app # Dossier contenant le code source pour le modèle KNN
+│ │ └── requirements.txt # Liste des dépendances Python nécessaires pour le modèle KNN
+│ ├── prometheus # Dossier pour la configuration de Prometheus (monitoring)
+│ │ └── prometheus.yml # Fichier de configuration pour Prometheus
+│ └── streamlit # Dossier pour l'application Streamlit
+│ ├── Dockerfile # Fichier pour construire l'image Docker de l'application Streamlit
+│ ├── app # Dossier contenant le code source de l'application Streamlit
+│ │ ├── **init**.py
+│ │ ├── app.py # Point d'entrée principal de l'application Streamlit
+│ │ ├── images # Dossier contenant les images utilisées dans l'application Streamlit
+│ │ └── pages # Dossier contenant les différentes pages de l'application Streamlit
+│ └── requirements.txt # Liste des dépendances Python nécessaires pour Streamlit
+├── notebooks # Dossier contenant les notebooks Jupyter pour l'exploration et le développement
+├── references # Dossier pouvant contenir des références bibliographiques ou autres documents pertinents
+├── reports # Dossier destiné aux rapports
+└── src # Dossier source contenant le code principal du projet
 
-    `./my_env/Scripts/activate`
-
-###   Install the packages from requirements.txt  (You can ignore the warning with "setup.py")
-
-    `pip install -r .\requirements.txt`
-
-### 2- Execute import_raw_data.py to import the 4 datasets (say yes when it asks you to create a new folder)
-
-    `python .\src\data\import_raw_data.py` 
-
-### 3- Execute make_dataset.py initializing `./data/raw` as input file path and `./data/processed` as output file path.
-
-    `python .\src\data\make_dataset.py`
-
-### 4- Execute build_features.py to preprocess the data (this can take a while)
-
-    `python .\src\features\build_features.py`
-
-### 5- Execute train_model.py to train the model
-
-    `python .\src\models\train_model.py`
-
-### 5- Finally, execute predict_model.py file to make the predictions (by default you will be printed predictions for the first 5 users of the dataset). 
-
-    `python .\src\models\predict_model.py`
-
-### Note that we have 10 recommandations per user
-
-<p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+---

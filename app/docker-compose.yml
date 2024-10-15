@@ -71,6 +71,7 @@ services:
     environment:
      - GF_SERVER_ROOT_URL=http://my.grafana.server/
      - GF_INSTALL_PLUGINS=grafana-clock-panel
+     - GF_SECURITY_ALLOW_EMBEDDING=true
     ports:
       - "3000:3000"
     volumes:
