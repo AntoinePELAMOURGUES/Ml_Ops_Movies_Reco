@@ -53,4 +53,72 @@ Ce repository est donc un témoignage de notre apprentissage et de notre capacit
 ├── reports                     # Dossier destiné aux rapports
 └── src                         # Dossier source contenant le code principal du projet
 
----
+```
+
+<h2>:diamond_shape_with_a_dot_inside:Guide de démarrage rapide</h2>
+
+Vous souhaitez avoir une recommndation de films ? Installez notre API en suivant ces étapes:
+
+##  🛠️ Prérequis
+
+Assurez-vous d'avoir installé les éléments suivants sur votre machine :
+
+1. [Python](https://www.python.org/) >= 3.9
+2. [Docker Desktop](https://docs.docker.com/desktop/)
+
+## :computer: Installation
+
+### Clonage du repository
+
+Clonnez ce repository sur votre machine locale :
+
+```bash
+git clone https://github.com/dongnold/dst-sept23-rakuten.git
+```
+
+## :wrench: Configuration de Git LFS
+
+Notre repository contient des modèles Machine Learning volumineux gérés par Git LFS. Après avoir cloné le repository, assurez-vous d'être connecté à Git LFS pour pouvoir télécharger les modèles.
+
+### Instructions :
+
+1. Naviguez jusqu'à la racine du répertoire cloné :
+
+```bash
+cd {REPOSITORY}
+```
+
+2. Connectez-vous à Git LFS :
+
+```bash
+git lfs login
+```
+
+  Entrez vos identifiants GitHub lorsque demandé.
+
+3. Téléchargez les modèles Machine Learning :
+
+```bash
+git lfs pull
+```
+
+4. Construction des images Docker
+   
+Naviguez jusqu'à la racine du répertoire cloné et construisez les images Docker nécessaires pour l'application Backend et Frontend :
+
+```bash
+cd {REPOSITORY}
+docker-compose up --build
+```
+
+Ouvrez ensuite un navigateur Web et visitez http://localhost:8000 pour afficher l'interface Streamlit.
+
+De plus, vous pouvez envoyer des requêtes HTTP vers notre API FastAPI en visitant http://localhost:8001. Consultez la documentation OpenAPI Swagger UI pour connaître les points de terminaison disponibles.
+
+## :skull: Arrêt de l'application
+
+Appuyez sur Ctrl+C dans le terminal pour arrêter l'application. Confirmez l'opération si nécessaire.
+
+
+
+
