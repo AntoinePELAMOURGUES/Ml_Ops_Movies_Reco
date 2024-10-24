@@ -8,6 +8,7 @@ services:
     volumes:
       - shared_raw:/app/data
       - shared_model:/app/model
+      - mongodb_data:/app/mongo_db
     container_name: model_trainer_predictor
 
   mongodb:
