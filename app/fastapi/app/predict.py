@@ -7,7 +7,6 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from rapidfuzz import process, fuzz, utils
-from sklearn.decomposition import TruncatedSVD
 from fastapi import Request, APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
 from prometheus_client import Counter, Histogram, CollectorRegistry
@@ -114,38 +113,41 @@ def create_X(df):
     return X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper
 
 # Predictions si utilisateur connu
-def find_similar_movies(movie_id, X, movie_mapper, movie_inv_mapper, model, k=11):
+def get_recommendations(user_id: int, model, X, user_mapper, movie_inv_mapper, n_recommendations=10):
     """
-    Trouve les k voisins les plus proches pour un ID de film donné.
-    Args:
-        movie_id: ID du film d'intérêt
-        X: matrice d'utilité utilisateur-article (matrice creuse)
-        k: nombre de films similaires à récupérer
-        metric: métrique de distance pour les calculs kNN
-    Output: retourne une liste des k ID de films similaires
-    """
-    # Transposer la matrice X pour que les films soient en lignes et les utilisateurs en colonnes
-    X = X.T
-    neighbour_ids = []  # Liste pour stocker les ID des films similaires
-    # Obtenir l'index du film à partir du mapper
-    movie_ind = movie_mapper[movie_id]
-    # Extraire le vecteur correspondant au film spécifié
-    movie_vec = X[movie_ind]
-    # Vérifier si movie_vec est un tableau NumPy et le remodeler en 2D si nécessaire
-    if isinstance(movie_vec, (np.ndarray)):
-        movie_vec = movie_vec.reshape(1, -1)  # Reshape pour avoir une forme (1, n_features)
-    # Chargement du modèle
-    kNN = model
-    # Trouver les k+1 voisins les plus proches (y compris le film d'intérêt)
-    kNN.fit(X)
+    Effectue des recommandations de films pour un utilisateur donné.
 
-    neighbour = kNN.kneighbors(movie_vec, return_distance=False)
-    # Collecter les ID des films parmi les voisins trouvés
-    for i in range(0, k):  # Boucler jusqu'à k pour obtenir seulement les films similaires
-        n = neighbour.item(i)  # Obtenir l'index du voisin
-        neighbour_ids.append(movie_inv_mapper[n])  # Mapper l'index à l'ID du film
-    neighbour_ids.pop(0)  # Retirer le premier élément qui est l'ID du film original
-    return neighbour_ids  # Retourner la liste des ID de films similaires
+    Args:
+        user_id: ID de l'utilisateur pour lequel faire des recommandations.
+        model: Le modèle KNN chargé.
+        X: Matrice creuse contenant les évaluations.
+        user_mapper: Dictionnaire qui mappe les IDs utilisateurs aux indices utilisateurs.
+        movie_inv_mapper: Dictionnaire qui mappe les indices de films aux IDs de films.
+        n_recommendations: Nombre de recommandations à retourner.
+
+    Returns:
+        recommendations: Liste des IDs de films recommandés.
+    """
+    X = X.T
+
+    # Vérifier si l'utilisateur existe dans le mappage
+    if user_id not in user_mapper:
+        print(f"L'utilisateur {user_id} n'existe pas dans les données.")
+        return []
+
+    # Obtenir l'index utilisateur
+    user_index = user_mapper[user_id]
+
+    # Obtenir les voisins
+    distances, indices = model.kneighbors(X[user_index], n_neighbors=n_recommendations + 1)
+
+    # Exclure l'utilisateur lui-même (premier voisin)
+    recommended_indices = indices.flatten()[1:]  # Ignorer le premier voisin (l'utilisateur lui-même)
+
+    # Convertir les indices recommandés en IDs de films
+    recommendations = [movie_inv_mapper[i] for i in recommended_indices]
+
+    return recommendations
 
 # Fonction recommendation si utilisateur inconnu
 def get_content_based_recommendations(title, n_recommendations=10):
@@ -228,10 +230,6 @@ movies_links_df = movies.merge(links, on = "movieId", how = 'left')
 model_knn = load_model()
 # Création de la matrice X et des mappers pour les utilisateurs et les films
 X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper = create_X(ratings)
-# Décomposition en valeurs singulières (SVD) pour la réduction de dimensionnalité
-svd = TruncatedSVD(n_components=20, n_iter=10)
-# Applique SVD à la transposée de la matrice X pour obtenir la matrice réduite Q
-Q = svd.fit_transform(X.T)
 # Création d'une représentation binaire des genres pour chaque film
 genres = set(g for G in movies['genres'] for g in G)
 for g in genres:
@@ -284,14 +282,14 @@ async def predict(user_request: UserRequest) -> Dict[str, Any]:
     # Récupération de l'ID du film à partir du titre
     movie_id = int(movies['movieId'][movies['title'] == movie_title].iloc[0])
     # Récupérer les ID des films recommandés en utilisant la fonction de similarité
-    similar_movies = find_similar_movies(movie_id, Q.T, movie_mapper, movie_inv_mapper, model = model_knn, k=11)
+    recommendations = get_recommendations(movie_id, model_knn, X, user_mapper, movie_inv_mapper)
     # Obtenir le titre et la couverture du film choisi par l'utilisateur
     movie_title = movie_titles[movie_id]
     movie_cover = movie_covers[movie_id]
     # Créer un dictionnaire pour stocker les titres et les couvertures des films recommandés
     result = {
         "user_choice": {"title": movie_title, "cover": movie_cover},
-        "recommendations": [{"title": movie_titles[i], "cover": movie_covers[i]} for i in similar_movies]
+        "recommendations": [{"title": movie_titles[i], "cover": movie_covers[i]} for i in recommendations]
     }
     # Mesurer la taille de la réponse et l'enregistrer
     response_size = len(json.dumps(result))

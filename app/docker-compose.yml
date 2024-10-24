@@ -14,11 +14,12 @@ services:
     image: mongo:latest
     volumes:
       - mongodb_data:/data/db
+      - shared_raw:/data/raw
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: antoine
-      MONGO_INITDB_ROOT_PASSWORD: pela
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     container_name: mongodb
     networks:
       - app
