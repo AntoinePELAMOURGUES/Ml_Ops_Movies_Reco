@@ -11,6 +11,15 @@ services:
       - mongodb_data:/app/mongo_db
     container_name: model_trainer_predictor
 
+  scrapping_data:
+    build:
+      context: ./scrapping_data
+      dockerfile: Dockerfile
+    volumes:
+      - shared_raw:/app/data
+      - mongodb_data:/app/mongo_db
+    container_name: scrapping_data
+
   mongodb:
     image: mongo:latest
     volumes:
@@ -71,9 +80,9 @@ services:
     image: grafana/grafana-enterprise
     restart: unless-stopped
     environment:
-     - GF_SERVER_ROOT_URL=http://my.grafana.server/
-     - GF_INSTALL_PLUGINS=grafana-clock-panel
-     - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_SERVER_ROOT_URL=http://my.grafana.server/
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+      - GF_SECURITY_ALLOW_EMBEDDING=true
     ports:
       - "3000:3000"
     volumes:
