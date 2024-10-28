@@ -34,6 +34,15 @@ services:
     networks:
       - app
 
+  mongodb_exporter:
+  image: percona/mongodb_exporter
+  environment:
+    - MONGODB_URI=mongodb://antoine:pela@mongodb:27017/admin
+  ports:
+    - "9216:9216"  # Port par défaut pour l'exportateur
+  networks:
+    - app
+
   fastapi:
     build:
       context: ./fastapi

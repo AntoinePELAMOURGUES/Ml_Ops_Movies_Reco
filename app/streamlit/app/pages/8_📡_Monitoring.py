@@ -6,7 +6,7 @@ if not st.session_state['is_logged_in']:
 
 st.markdown("<h1 style='text-align: center;'>Testing & Monitoring</h1>", unsafe_allow_html=True)
 
-grafana_url = "http://http://127.0.0.1:3000/d/ddz3bcm35rqiod/reco-movies-monitoring?orgId=1&refresh=auto"
+grafana_url = "http://grafana:3000/d/ddz3bcm35rqiod/reco-movies-monitoring?orgId=1&refresh=auto"
 
 # Embed the Grafana dashboard using an iframe
 st.markdown(

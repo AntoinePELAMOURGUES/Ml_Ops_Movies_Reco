@@ -22,7 +22,13 @@ with st.form("user_info_no", clear_on_submit=True):
             st.write("Film sélectionné :")
             user_choice = result['user_choice']
             caption = f"{user_choice['title']}"
-            st.image(user_choice["cover"], caption=caption, width=180)
+            # Vérifiez si movie["cover"] est None
+            if user_choice["cover"] is None:
+                # Utilisez l'image par défaut si cover est None
+                st.image("images/video.png", caption=caption, width=180)
+            else:
+                # Sinon, utilisez l'image du film
+                st.image(user_choice["cover"], caption=caption, width=180)
             st.write("Nos 10 recommandations :")
             recommended_movies = result['recommendations']
 
@@ -32,7 +38,13 @@ with st.form("user_info_no", clear_on_submit=True):
                 col_index = i % 5
                 with cols_recommended_movies[col_index]:
                     caption = f"{movie['title']}"
-                    st.image(movie["cover"], caption=caption, use_column_width=True)
+                    # Vérifiez si movie["cover"] est None
+                    if movie["cover"] is None:
+                        # Utilisez l'image par défaut si cover est None
+                        st.image("images/video.png", caption=caption, use_column_width=True)
+                    else:
+                        # Sinon, utilisez l'image du film
+                        st.image(movie["cover"], caption=caption, use_column_width=True)
 
             # Ajouter une ligne horizontale
             st.markdown("---")
@@ -43,7 +55,12 @@ with st.form("user_info_no", clear_on_submit=True):
                 col_index = i % 5
                 with cols_recommended_movies_second_half[col_index]:
                     caption = f"{movie['title']}"
-                    st.image(movie["cover"], caption=caption, use_column_width=True)
+                    if movie["cover"] is None:
+                        # Utilisez l'image par défaut si cover est None
+                        st.image("images/video.png", caption=caption, use_column_width=True)
+                    else:
+                        # Sinon, utilisez l'image du film
+                        st.image(movie["cover"], caption=caption, use_column_width=True)
 
         else:
             st.error(f"Erreur lors de la requête : {response.status_code} - {response.text}")
