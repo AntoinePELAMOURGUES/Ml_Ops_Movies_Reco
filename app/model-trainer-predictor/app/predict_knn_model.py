@@ -1,23 +1,32 @@
 import pandas as pd
 import os
 import numpy as np
-import os
 import pickle
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
+from pymongo import MongoClient
+import mlflow
+import mlflow.sklearn
 
+def connect_to_mongodb(uri: str, db_name: str):
+    """Établit une connexion à la base de données MongoDB."""
+    client = MongoClient(uri)
+    return client[db_name]
 
-def read_ratings(ratings_csv: str, data_dir: str = "/app/data") -> pd.DataFrame:
-    """Lit le fichier CSV contenant les évaluations des films."""
-    data = pd.read_csv(os.path.join(data_dir, ratings_csv))
-    print("Dataset ratings chargé")
+def read_ratings(db) -> pd.DataFrame:
+    """Lit les évaluations des films depuis MongoDB."""
+    ratings_collection = db.ratings
+    data = pd.DataFrame(list(ratings_collection.find()))
+    print("Dataset ratings chargé depuis MongoDB")
     return data
 
-def read_movies(movies_csv: str, data_dir: str = "/app/data") -> pd.DataFrame:
-    """Lit le fichier CSV contenant les informations sur les films."""
-    df = pd.read_csv(os.path.join(data_dir, movies_csv))
-    print("Dataset movies chargé")
+def read_movies(db) -> pd.DataFrame:
+    """Lit les informations sur les films depuis MongoDB."""
+    movies_collection = db.movies
+    df = pd.DataFrame(list(movies_collection.find()))
+    print("Dataset movies chargé depuis MongoDB")
     return df
+
 
 def create_X(df):
     """
@@ -52,38 +61,36 @@ def create_X(df):
 
     return X
 
-def train_model(X, k = 10):
+def train_model(X, k=10):
     X = X.T
     kNN = NearestNeighbors(n_neighbors=k + 1, algorithm="brute", metric='cosine')
     model = kNN.fit(X)
     return model
 
-def save_model(model, filepath: str) -> None:
-    """Sauvegarde le modèle entraîné dans un fichier."""
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    directory = os.path.join(filepath, 'model_knn.pkl')
-    with open(directory, 'wb') as file:
-        pickle.dump(model, file)
-        print(f'Modèle sauvegardé sous {filepath}/model.pkl')
+def save_model(model, experiment_name: str) -> None:
+    """Sauvegarde le modèle entraîné dans MLflow."""
 
+    mlflow.set_experiment(experiment_name)  # Définir l'expérience
 
-def read_version(filepath: str) -> int:
-    """Lit la version actuelle à partir d'un fichier."""
-    if not os.path.exists(filepath):
-        return 0  # Valeur par défaut si le fichier n'existe pas
-    with open(filepath, 'r') as file:
-        return int(file.read().strip())
+    with mlflow.start_run() as run:
+        # Enregistrer le modèle dans MLflow
+        mlflow.sklearn.log_model(model, "model")
+        print(f'Modèle sauvegardé sous l\'ID de run : {run.info.run_id}')
 
-def write_version(filepath: str, version: int) -> None:
-    """Écrit la nouvelle version dans un fichier."""
-    with open(filepath, 'w') as file:
-        file.write(str(version))
 
 if __name__ == "__main__":
+    # Connexion à MongoDB
+    mongo_uri = "mongodb://antoine:pela@mongodb:27017/"
+    db_name = "reco_movies"
 
-    # Chargement des données
-    ratings = read_ratings('ratings.csv')
-    movies = read_movies('movies.csv')
+    db = connect_to_mongodb(mongo_uri, db_name)
+
+    # Chargement des données depuis MongoDB
+    ratings = read_ratings(db)
+    movies = read_movies(db)
+
     X = create_X(ratings)
     model_knn = train_model(X)
-    save_model(model_knn, '/app/model')
+
+    # Enregistrer le modèle avec un nom d'expérience spécifique
+    save_model(model_knn, 'MovieRecommendationModel')
