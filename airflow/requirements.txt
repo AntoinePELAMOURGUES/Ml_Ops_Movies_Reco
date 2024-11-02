@@ -1,0 +1,9 @@
+mlflow
+scikit-learn
+pymongo
+pandas
+numpy
+bs4
+lxml
+pymongo
+requests

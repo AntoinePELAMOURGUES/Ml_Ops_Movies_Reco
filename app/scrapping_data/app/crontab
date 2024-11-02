@@ -1,4 +1,0 @@
-# Crontab pour exécuter le script de scraping tous les jours à 21h00
-0 21 * * * python /app/scrapping.py >> /var/log/cron.log 2>&1
-
-#

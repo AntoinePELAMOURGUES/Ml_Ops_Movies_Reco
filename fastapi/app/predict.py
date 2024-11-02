@@ -24,45 +24,25 @@ router = APIRouter(
 
 # ENSEMBLE DES FONCTIONS UTILISEES
 
-# Ouverture fichier ratings
+# Chargement des datasets
 def read_ratings(ratings_csv: str, data_dir: str = "/app/raw") -> pd.DataFrame:
-    """
-    Lit le fichier CSV contenant les évaluations des films.
-
-    :param ratings_csv: Nom du fichier CSV contenant les évaluations.
-    :param data_dir: Répertoire où se trouve le fichier CSV.
-    :return: DataFrame contenant les évaluations.
-    """
+    """Reads the CSV file containing movie ratings."""
     data = pd.read_csv(os.path.join(data_dir, ratings_csv))
-    print("Dataset ratings chargé")
+    print("Dataset ratings loaded")
     return data
 
-# Ouverture fichier movies
 def read_movies(movies_csv: str, data_dir: str = "/app/raw") -> pd.DataFrame:
-    """
-    Lit le fichier CSV contenant les informations sur les films.
-
-    :param movies_csv: Nom du fichier CSV contenant les informations sur les films.
-    :param data_dir: Répertoire où se trouve le fichier CSV.
-    :return: DataFrame contenant les informations sur les films.
-    """
+    """Reads the CSV file containing movie information."""
     df = pd.read_csv(os.path.join(data_dir, movies_csv))
-    print("Dataset movies chargé")
+    print("Dataset movies loaded")
     return df
 
-# Ouverture fichier links
 def read_links(links_csv: str, data_dir: str = "/app/raw") -> pd.DataFrame:
-    """
-    Lit le fichier CSV contenant les informations sur les liens des affiches scrappés.
-
-    :param links_csv: Nom du fichier CSV contenant les liens des affiches.
-    :param data_dir: Répertoire où se trouve le fichier CSV.
-    :return: DataFrame contenant movieId et lien vers les affiches.
-    """
+    """Reads the CSV file containing movie information."""
     df = pd.read_csv(os.path.join(data_dir, links_csv))
-    df = df[['movieId', 'cover_link']]
-    print("Dataset links chargé")
+    print("Dataset links loaded")
     return df
+
 
 # Chargement du dernier modèle
 def load_model(directory = "/app/model") :
@@ -217,13 +197,11 @@ error_counter = Counter(
 
 # CHARGEMENT DES DONNEES AU DEMARRAGE DE API
 print("DEBUT DES CHARGEMENTS")
-# Lecture des fichiers CSV contenant les données
+# Chargement de nos dataframe depuis mongo_db
 ratings = read_ratings('ratings.csv')
 movies = read_movies('movies.csv')
-# Convertit la chaîne de genres en liste en séparant par '|'
-movies['genres'] = movies['genres'].apply(lambda x: x.split("|"))
-# Charge les liens vers les couvertures des films
 links = read_links('links2.csv')
+
 # Merge de movies et links pour avoir un ix commun
 movies_links_df = movies.merge(links, on = "movieId", how = 'left')
 # Chargement d'un modèle KNN (K-Nearest Neighbors) pré-entraîné pour les recommandations
@@ -232,11 +210,15 @@ model_knn = load_model()
 X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper = create_X(ratings)
 # Création d'une représentation binaire des genres pour chaque film
 genres = set(g for G in movies['genres'] for g in G)
+# Convertir le set en liste
+genre_list = list(genres)
+# Créer un DataFrame vide avec les genres comme colonnes
+genre_columns = pd.DataFrame(0, index=movies.index, columns=genre_list)
+# Remplir le DataFrame avec des 1 là où le genre est présent
 for g in genres:
-    # Ajoute une colonne binaire pour chaque genre (1 si présent, sinon 0)
-    movies[g] = movies.genres.transform(lambda x: int(g in x))
+    genre_columns[g] = movies['genres'].apply(lambda x: int(g in x))
 # Préparation d'une matrice contenant uniquement les colonnes de genres, sans ID et titre
-movie_genres = movies.drop(columns=['movieId', 'title', 'genres'])
+movie_genres = pd.concat([movies.drop(columns=['movieId', 'title', 'genres']), genre_columns], axis=1)
 # Création de dictionnaires pour faciliter l'accès aux titres et aux couvertures des films par leur ID
 movie_idx = dict(zip(movies['title'], list(movies.index)))
 cover_idx = dict(zip(movies_links_df['cover_link'], list(movies_links_df.index)))
