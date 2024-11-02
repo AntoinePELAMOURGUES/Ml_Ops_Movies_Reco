@@ -7,3 +7,4 @@ bs4
 lxml
 pymongo
 requests
+scikit-surprise
