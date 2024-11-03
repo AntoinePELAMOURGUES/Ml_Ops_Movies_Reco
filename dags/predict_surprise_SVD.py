@@ -1,99 +1,108 @@
 import pandas as pd
-import numpy as np
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 import os
-import pickle
 from surprise import Dataset, Reader
 from surprise.prediction_algorithms.matrix_factorization import SVD
-from surprise.model_selection import cross_validate
+from surprise.model_selection import train_test_split
+from surprise import accuracy
 import mlflow
-import mlflow.sklearn  # Assurez-vous d'importer mlflow.sklearn
+import pickle
+from datetime import datetime
 
 # Configuration de MLflow
-mlflow.set_tracking_uri("http://mlflow-webserver:5000")
-mlflow.set_experiment("Movie_Recommendation_Experiment")
+mlflow.set_tracking_uri("http://mlflow_webserver:5000")
+EXPERIMENT_NAME = "Movie_Recommendation_Experiment"
+time = datetime.now()
+run_name = f"{time}"
 
 def read_ratings(ratings_csv: str, data_dir: str = "/opt/airflow/data/raw") -> pd.DataFrame:
-    """Reads the CSV file containing movie ratings."""
-    data = pd.read_csv(os.path.join(data_dir, ratings_csv))
-    print("Dataset ratings loaded")
-    return data
+    """Lit le fichier CSV contenant les évaluations des films."""
+    try:
+        # Lire le fichier CSV et retourner un DataFrame Pandas
+        data = pd.read_csv(os.path.join(data_dir, ratings_csv))
+        print("Dataset ratings loaded")
+        return data
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        raise
 
-def train_model(df: pd.DataFrame) -> SVD:
-    """Entraîne le modèle de recommandation sur les données fournies."""
+def train_model() -> tuple:
+    """Entraîne le modèle de recommandation sur les données fournies et retourne le modèle et son RMSE."""
     # Démarrer un nouveau run dans MLflow
-    with mlflow.start_run() as run:
-        reader = Reader(rating_scale=(0.5, 5))
-        data = Dataset.load_from_df(df[['userId', 'movieId', 'rating']], reader=reader)
-        trainset = data.build_full_trainset()
+    with mlflow.start_run(run_name=run_name) as run:
+        # Charger les données d'évaluation des films
+        ratings = read_ratings('ratings.csv')
 
+        # Préparer les données pour Surprise
+        reader = Reader(rating_scale=(0.5, 5))
+        data = Dataset.load_from_df(ratings[['userId', 'movieId', 'rating']], reader=reader)
+
+        # Diviser les données en ensembles d'entraînement et de test
+        trainset, testset = train_test_split(data, test_size=0.25)
+
+        # Créer et entraîner le modèle SVD
         model = SVD(n_factors=150, n_epochs=30, lr_all=0.01, reg_all=0.05)
         model.fit(trainset)
 
-        print("Début de la cross-validation")
-        cv_results = cross_validate(model, data, measures=['RMSE', 'MAE'], cv=5, return_train_measures=True)
+        # Tester le modèle sur l'ensemble de test et calculer RMSE
+        predictions = model.test(testset)
+        acc = accuracy.rmse(predictions)
+        # Arrondir à 2 chiffres après la virgule
+        acc_rounded = round(acc, 2)
 
-        mean_rmse = cv_results['test_rmse'].mean()
-        print("Moyenne des RMSE :", mean_rmse)
+        print("Valeur de l'écart quadratique moyen (RMSE) :", acc_rounded)
 
-        # Enregistrer les métriques dans MLflow
+        # Enregistrer les métriques dans MLflow pour suivi ultérieur
         mlflow.log_param("n_factors", 150)
         mlflow.log_param("n_epochs", 30)
         mlflow.log_param("lr_all", 0.01)
         mlflow.log_param("reg_all", 0.05)
-        mlflow.log_metric("mean_rmse", mean_rmse)
 
-        # Sauvegarder le modèle dans MLflow
-        mlflow.sklearn.log_model(model, "model")
+        """Récupère le dernier RMSE enregistré dans MLflow."""
+        mlflow.set_experiment(EXPERIMENT_NAME)
 
-    return model, mean_rmse
+        # Récupérer les dernières exécutions triées par RMSE décroissant, en prenant la première (meilleure)
+        runs = mlflow.search_runs(order_by=["metrics.rmse desc"], max_results=1)
+        print("Chargement des anciens RMSE pour comparaison")
 
-def save_model(model: SVD, filepath: str, version: str) -> None:
-    """Sauvegarde le modèle entraîné dans un fichier."""
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    base, ext = os.path.splitext(filepath)
-    versioned_filepath = f"{base}_{version}{ext}"
+        if not runs.empty:
+            last_rmse = runs.iloc[0]["metrics.rmse"]
+        else:
+            last_rmse = float('inf')  # Si aucun run n'est trouvé, retourner une valeur infinie
 
-    with open(versioned_filepath, 'wb') as file:
-        pickle.dump(model, file)
-        print(f'Modèle sauvegardé sous {versioned_filepath}')
+        print(f"Meilleur RMSE actuel: {last_rmse}, Nouveau RMSE: {acc_rounded}")
 
+        if acc_rounded < last_rmse:
+            print("Nouveau modèle meilleur, sauvegarde...")
+
+            directory = '/opt/airflow/model/model_svd.pkl'
+
+            with open(directory, 'wb') as file:
+                pickle.dump(model, file)
+                print(f'Modèle sauvegardé sous {directory}')
+        else:
+            print("Ancien modèle conservé ...")
 # Définition du DAG Airflow
-default_args = {
-    'owner': 'airflow',
-    'start_date': pd.to_datetime('2024-11-01'),
-}
 
-dag = DAG(
-    'movie_recommendation_dag',
-    tag=['reco_movies'],
-    default_args=default_args,
-    description='DAG for training movie recommendation model with MLflow integration',
+svd_dag = DAG(
+    dag_id='SVD_train_and_compare_model',
+    description='SVD Model for Movie Recommendation',
+    tags=['reco_movies'],
     schedule_interval='@daily',
+    default_args={
+        'owner': 'airflow',
+        'start_date': datetime(2024, 11, 3),
+    }
 )
 
 # Tâches du DAG
-read_ratings_task = PythonOperator(
-    task_id='read_ratings',
-    python_callable=read_ratings,
-    op_kwargs={'ratings_csv': 'ratings.csv'},
-    dag=dag,
+
+train_task = PythonOperator(
+   task_id='train_model',
+   python_callable=train_model,
+   dag=svd_dag,
 )
 
-train_model_task = PythonOperator(
-    task_id='train_model',
-    python_callable=train_model,
-    op_kwargs={'df': "{{ task_instance.xcom_pull(task_ids='read_ratings') }}"},
-    dag=dag,
-)
-
-save_model_task = PythonOperator(
-    task_id='save_model',
-    python_callable=save_model,
-    op_kwargs={'model': "{{ task_instance.xcom_pull(task_ids='train_model') }}", 'filepath': '/opt/airflow/models/model_SVD.pkl', 'version': 'v1'},
-    dag=dag,
-)
-
-# Définir l'ordre des tâches
-read_ratings_task >> train_model_task >> save_model_task
+if __name__ == "__main__":
+   svd_dag.cli()

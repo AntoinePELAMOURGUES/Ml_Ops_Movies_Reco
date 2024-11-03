@@ -19,11 +19,12 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__CORE__ENABLE_XCOM_PICKLING: 'true'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_HOME: /opt/airflow
     PYTHONPATH: "$$PYTHONPATH:/opt/airflow/plugins"
     # Sets the tracking uri env variable for mlflow in all airflow containers
-    MLFLOW_TRACKING_URI: "http://mlflow-webserver:5000"
+    MLFLOW_TRACKING_URI: "http://mlflow_webserver:5000"
     GIT_PYTHON_REFRESH: "quiet"
   volumes:
     - ./dags:/opt/airflow/dags
@@ -43,77 +44,84 @@ x-airflow-common:
 
 services:
 
-  # # This container runs the postgresql database for mlflow.
-  # postgres-mlflow:
-  #   image: postgres:13
-  #   container_name: fastapi
-  #   environment:
-  #     POSTGRES_USER: mlflow
-  #     POSTGRES_PASSWORD: mlflow
-  #     POSTGRES_DB: mlflow
-  #   volumes:
-  #     - postgres-db-volume-mlflow:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD", "pg_isready", "-U", "mlflow"]
-  #     interval: 5s
-  #     retries: 5
-  #   restart: always
-  #   networks:
-  #     - app
+  # This container runs the postgresql database for mlflow.
+  postgres-mlflow:
+    image: postgres:13
+    container_name: postgres_mlflow
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
+      POSTGRES_DB: mlflow
+    volumes:
+      - postgres-db-volume-mlflow:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "mlflow"]
+      interval: 5s
+      retries: 5
+    restart: always
+    networks:
+      - app
 
-  # # This container runs the artifact storage as an S3 server.
-  # s3-artifact-storage:
-  #   image: minio/minio
-  #   volumes:
-  #     - mlflow-data:/data
-  #   environment:
-  #     &env-mlflow-s3
-  #     MINIO_ROOT_USER: mlflow_access
-  #     MINIO_ROOT_PASSWORD: mlflow_secret
-  #   command: server /data --console-address ":9001"
-  #   ports:
-  #     - 9000:9000
-  #     - 9001:9001
-  #   healthcheck:
-  #     test: ["CMD", "curl -I http://localhost:9000/minio/health/live"]
-  #     interval: 5s
-  #     retries: 5
-  #   restart: always
-  #   networks:
-  #     - app
+  # This container runs the artifact storage as an S3 server.
+  s3-artifact-storage:
+    image: minio/minio
+    volumes:
+      - mlflow-data:/data
+    environment:
+      &env-mlflow-s3
+      MINIO_ROOT_USER: mlflow_access
+      MINIO_ROOT_PASSWORD: mlflow_secret
+    command: server /data --console-address ":9001"
+    container_name: s3_storage
+    ports:
+      - 9000:9000
+      - 9001:9001
+    healthcheck:
+      test: ["CMD", "curl -I http://localhost:9000/minio/health/live"]
+      interval: 5s
+      retries: 5
+    restart: always
+    networks:
+      - app
 
-  # # This container creates the "data" in the S3 server, in which mlflow will later store the artifacts.
-  # mlflow-init:
-  #   image: minio/mc
-  #   depends_on:
-  #     - s3-artifact-storage
-  #   environment:
-  #     <<: *env-mlflow-s3
-  #   entrypoint: >
-  #     /bin/sh -c "
-  #     /usr/bin/mc config host add myminio http://s3-artifact-storage:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
-  #     /usr/bin/mc mb myminio/data;
-  #     /usr/bin/mc policy download myminio/data;
-  #     exit 0;
-  #     "
+  # This container creates the "data" in the S3 server, in which mlflow will later store the artifacts.
+  mlflow-init:
+    image: minio/mc
+    container_name: mlflow_init
+    depends_on:
+      - s3-artifact-storage
+    environment:
+      <<: *env-mlflow-s3
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add myminio http://s3-artifact-storage:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+      /usr/bin/mc mb myminio/data;
+      /usr/bin/mc policy download myminio/data;
+      exit 0;
+      "
+    networks:
+    - app
 
-  # # This container runs the webserver for mlflow.
-  # mlflow-webserver:
-  #   build: ./mlflow
-  #   ports:
-  #     - 5000:5000
-  #   environment:
-  #     MLFLOW_S3_ENDPOINT_URL: http://s3-artifact-storage:9000
-  #     MLFLOW_S3_IGNORE_TLS: "true"
-  #     AWS_ACCESS_KEY_ID: "mlflow_access"
-  #     AWS_SECRET_ACCESS_KEY: "mlflow_secret"
-  #   command: mlflow server --backend-store-uri postgresql://mlflow:mlflow@postgres-mlflow/mlflow --artifacts-destination s3://data -h 0.0.0.0 -p 5000 --serve-artifacts
-  #   depends_on:
-  #     - postgres-mlflow
-  #     - s3-artifact-storage
-  #     - mlflow-init
-  #   networks:
-  #     - app
+  # This container runs the webserver for mlflow.
+  mlflow-webserver:
+    build: ./mlflow
+    container_name: mlflow_webserver
+    ports:
+      - 5000:5000
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://s3-artifact-storage:9000
+      MLFLOW_S3_IGNORE_TLS: "true"
+      AWS_ACCESS_KEY_ID: "mlflow_access"
+      AWS_SECRET_ACCESS_KEY: "mlflow_secret"
+    command: mlflow server --backend-store-uri postgresql://mlflow:mlflow@postgres-mlflow/mlflow --artifacts-destination s3://data -h 0.0.0.0 -p 5000 --serve-artifacts
+    depends_on:
+      - postgres-mlflow
+      - s3-artifact-storage
+      - mlflow-init
+    networks:
+      - app
+    volumes:
+      ./data/model:/data/model
 
   # This container runs the postgresql server for airflow.
   postgres:
@@ -445,3 +453,5 @@ volumes:
   shared_prometheus:
   grafana_data:
   postgres-db-volume-airflow:
+  postgres-db-volume-mlflow:
+  mlflow-data:

@@ -2,6 +2,9 @@ import pandas as pd
 import os
 import json
 import pickle
+from surprise import Dataset, Reader
+from surprise.prediction_algorithms.matrix_factorization import SVD
+from surprise import accuracy
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics.pairwise import cosine_similarity
@@ -51,83 +54,106 @@ def load_model(directory = "/app/model") :
     if not os.path.exists(directory):
         raise FileNotFoundError(f"Le répertoire {directory} n'existe pas.")
     # Charger le modèle
-    filepath = os.path.join(directory, 'model_knn.pkl')
+    filepath = os.path.join(directory, 'model_svd.pkl')
     with open(filepath, 'rb') as file:
         model = pickle.load(file)
         print(f'Modèle chargé depuis {filepath}')
     return model
 
-# Creation de notre matrice creuse
-def create_X(df):
-    """
-    Génère une matrice creuse avec quatre dictionnaires de mappage
-    - user_mapper: mappe l'ID utilisateur à l'index utilisateur
-    - movie_mapper: mappe l'ID du film à l'index du film
-    - user_inv_mapper: mappe l'index utilisateur à l'ID utilisateur
-    - movie_inv_mapper: mappe l'index du film à l'ID du film
-    Args:
-        df: pandas dataframe contenant 3 colonnes (userId, movieId, rating)
-    Returns:
-        X: sparse matrix
-        user_mapper: dict that maps user id's to user indices
-        user_inv_mapper: dict that maps user indices to user id's
-        movie_mapper: dict that maps movie id's to movie indices
-        movie_inv_mapper: dict that maps movie indices to movie id's
-    """
-      # Nombre unique d'utilisateurs et de films
-    M = df['userId'].nunique()  # Compte le nombre d'utilisateurs uniques
-    N = df['movieId'].nunique()  # Compte le nombre de films uniques
-    # Créer un dictionnaire pour mapper les IDs utilisateurs à des indices
-    user_mapper = dict(zip(np.unique(df["userId"]), list(range(M))))
-    # Créer un dictionnaire pour mapper les IDs de films à des indices
-    movie_mapper = dict(zip(np.unique(df["movieId"]), list(range(N))))
-    # Créer un dictionnaire inverse pour mapper les indices utilisateurs aux IDs utilisateurs
-    user_inv_mapper = dict(zip(list(range(M)), np.unique(df["userId"])))
-    # Créer un dictionnaire inverse pour mapper les indices de films aux IDs de films
-    movie_inv_mapper = dict(zip(list(range(N)), np.unique(df["movieId"])))
-    # Obtenir les indices correspondants pour chaque utilisateur et film dans le DataFrame
-    user_index = [user_mapper[i] for i in df['userId']]  # Convertir les IDs utilisateurs en indices
-    item_index = [movie_mapper[i] for i in df['movieId']]  # Convertir les IDs de films en indices
-    # Créer une matrice creuse en utilisant les évaluations, les indices d'utilisateur et de film
-    X = csr_matrix((df["rating"], (user_index, item_index)), shape=(M, N))
-    return X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper
+# Fonction pour obtenir des recommandations
+def get_recommendations(user_id: int, model: SVD, ratings_df: pd.DataFrame, n_recommendations: int = 10):
+    """Obtenir des recommandations pour un utilisateur donné."""
+    # Créer un DataFrame contenant tous les films
+    all_movies = ratings_df['movieId'].unique()
 
-# Predictions si utilisateur connu
-def get_recommendations(user_id: int, model, X, user_mapper, movie_inv_mapper, n_recommendations=10):
-    """
-    Effectue des recommandations de films pour un utilisateur donné.
+    # Obtenir les films déjà évalués par l'utilisateur
+    rated_movies = ratings_df[ratings_df['userId'] == user_id]['movieId'].tolist()
 
-    Args:
-        user_id: ID de l'utilisateur pour lequel faire des recommandations.
-        model: Le modèle KNN chargé.
-        X: Matrice creuse contenant les évaluations.
-        user_mapper: Dictionnaire qui mappe les IDs utilisateurs aux indices utilisateurs.
-        movie_inv_mapper: Dictionnaire qui mappe les indices de films aux IDs de films.
-        n_recommendations: Nombre de recommandations à retourner.
+    # Trouver les films non évalués par l'utilisateur
+    unseen_movies = [movie for movie in all_movies if movie not in rated_movies]
 
-    Returns:
-        recommendations: Liste des IDs de films recommandés.
-    """
-    X = X.T
+    # Préparer les prédictions pour les films non évalués
+    predictions = []
+    for movie_id in unseen_movies:
+        pred = model.predict(user_id, movie_id)
+        predictions.append((movie_id, pred.est))  # Ajouter l'ID du film et la note prédite
 
-    # Vérifier si l'utilisateur existe dans le mappage
-    if user_id not in user_mapper:
-        print(f"L'utilisateur {user_id} n'existe pas dans les données.")
-        return []
+    # Trier les prédictions par note prédite (descendant) et prendre les meilleures n_recommendations
+    top_n = sorted(predictions, key=lambda x: x[1], reverse=True)[:n_recommendations]
 
-    # Obtenir l'index utilisateur
-    user_index = user_mapper[user_id]
+    return top_n  # Retourner les meilleures recommandations
 
-    # Obtenir les voisins
-    distances, indices = model.kneighbors(X[user_index], n_neighbors=n_recommendations + 1)
+# # Creation de notre matrice creuse
+# def create_X(df):
+#     """
+#     Génère une matrice creuse avec quatre dictionnaires de mappage
+#     - user_mapper: mappe l'ID utilisateur à l'index utilisateur
+#     - movie_mapper: mappe l'ID du film à l'index du film
+#     - user_inv_mapper: mappe l'index utilisateur à l'ID utilisateur
+#     - movie_inv_mapper: mappe l'index du film à l'ID du film
+#     Args:
+#         df: pandas dataframe contenant 3 colonnes (userId, movieId, rating)
+#     Returns:
+#         X: sparse matrix
+#         user_mapper: dict that maps user id's to user indices
+#         user_inv_mapper: dict that maps user indices to user id's
+#         movie_mapper: dict that maps movie id's to movie indices
+#         movie_inv_mapper: dict that maps movie indices to movie id's
+#     """
+#       # Nombre unique d'utilisateurs et de films
+#     M = df['userId'].nunique()  # Compte le nombre d'utilisateurs uniques
+#     N = df['movieId'].nunique()  # Compte le nombre de films uniques
+#     # Créer un dictionnaire pour mapper les IDs utilisateurs à des indices
+#     user_mapper = dict(zip(np.unique(df["userId"]), list(range(M))))
+#     # Créer un dictionnaire pour mapper les IDs de films à des indices
+#     movie_mapper = dict(zip(np.unique(df["movieId"]), list(range(N))))
+#     # Créer un dictionnaire inverse pour mapper les indices utilisateurs aux IDs utilisateurs
+#     user_inv_mapper = dict(zip(list(range(M)), np.unique(df["userId"])))
+#     # Créer un dictionnaire inverse pour mapper les indices de films aux IDs de films
+#     movie_inv_mapper = dict(zip(list(range(N)), np.unique(df["movieId"])))
+#     # Obtenir les indices correspondants pour chaque utilisateur et film dans le DataFrame
+#     user_index = [user_mapper[i] for i in df['userId']]  # Convertir les IDs utilisateurs en indices
+#     item_index = [movie_mapper[i] for i in df['movieId']]  # Convertir les IDs de films en indices
+#     # Créer une matrice creuse en utilisant les évaluations, les indices d'utilisateur et de film
+#     X = csr_matrix((df["rating"], (user_index, item_index)), shape=(M, N))
+#     return X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper
 
-    # Exclure l'utilisateur lui-même (premier voisin)
-    recommended_indices = indices.flatten()[1:]  # Ignorer le premier voisin (l'utilisateur lui-même)
+# # Predictions si utilisateur connu
+# def get_recommendations(user_id: int, model, X, user_mapper, movie_inv_mapper, n_recommendations=10):
+#     """
+#     Effectue des recommandations de films pour un utilisateur donné.
 
-    # Convertir les indices recommandés en IDs de films
-    recommendations = [movie_inv_mapper[i] for i in recommended_indices]
+#     Args:
+#         user_id: ID de l'utilisateur pour lequel faire des recommandations.
+#         model: Le modèle KNN chargé.
+#         X: Matrice creuse contenant les évaluations.
+#         user_mapper: Dictionnaire qui mappe les IDs utilisateurs aux indices utilisateurs.
+#         movie_inv_mapper: Dictionnaire qui mappe les indices de films aux IDs de films.
+#         n_recommendations: Nombre de recommandations à retourner.
 
-    return recommendations
+#     Returns:
+#         recommendations: Liste des IDs de films recommandés.
+#     """
+#     X = X.T
+
+#     # Vérifier si l'utilisateur existe dans le mappage
+#     if user_id not in user_mapper:
+#         print(f"L'utilisateur {user_id} n'existe pas dans les données.")
+#         return []
+
+#     # Obtenir l'index utilisateur
+#     user_index = user_mapper[user_id]
+
+#     # Obtenir les voisins
+#     distances, indices = model.kneighbors(X[user_index], n_neighbors=n_recommendations + 1)
+
+#     # Exclure l'utilisateur lui-même (premier voisin)
+#     recommended_indices = indices.flatten()[1:]  # Ignorer le premier voisin (l'utilisateur lui-même)
+
+#     # Convertir les indices recommandés en IDs de films
+#     recommendations = [movie_inv_mapper[i] for i in recommended_indices]
+
+#     return recommendations
 
 # Fonction recommendation si utilisateur inconnu
 def get_content_based_recommendations(title, n_recommendations=10):
@@ -205,9 +231,9 @@ links = read_links('links2.csv')
 # Merge de movies et links pour avoir un ix commun
 movies_links_df = movies.merge(links, on = "movieId", how = 'left')
 # Chargement d'un modèle KNN (K-Nearest Neighbors) pré-entraîné pour les recommandations
-model_knn = load_model()
-# Création de la matrice X et des mappers pour les utilisateurs et les films
-X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper = create_X(ratings)
+model_svd = load_model()
+# # Création de la matrice X et des mappers pour les utilisateurs et les films
+# X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper = create_X(ratings)
 # Création d'une représentation binaire des genres pour chaque film
 genres = set(g for G in movies['genres'] for g in G)
 # Convertir le set en liste
@@ -264,7 +290,7 @@ async def predict(user_request: UserRequest) -> Dict[str, Any]:
     # Récupération de l'ID du film à partir du titre
     movie_id = int(movies['movieId'][movies['title'] == movie_title].iloc[0])
     # Récupérer les ID des films recommandés en utilisant la fonction de similarité
-    recommendations = get_recommendations(movie_id, model_knn, X, user_mapper, movie_inv_mapper)
+    recommendations = get_recommendations(user_id, model_svd, ratings)
     # Obtenir le titre et la couverture du film choisi par l'utilisateur
     movie_title = movie_titles[movie_id]
     movie_cover = movie_covers[movie_id]

@@ -15,4 +15,4 @@ matplotlib
 rapidfuzz
 scipy
 pymongo
-
+scikit-surprise
