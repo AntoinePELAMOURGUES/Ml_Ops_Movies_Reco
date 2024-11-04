@@ -66,7 +66,7 @@ services:
   s3-artifact-storage:
     image: minio/minio
     volumes:
-      - mlflow-data:/data
+      - ./mlflow-data:/data
     environment:
       &env-mlflow-s3
       MINIO_ROOT_USER: mlflow_access
@@ -121,7 +121,7 @@ services:
     networks:
       - app
     volumes:
-      ./data/model:/data/model
+      - ./data/model:/data/model
 
   # This container runs the postgresql server for airflow.
   postgres:
@@ -384,10 +384,9 @@ services:
     env_file:
       - .env
     volumes:
-      - ./fastapi/app:/app
       - ./data/raw/:/app/raw
       - ./data/model/:/app/model
-      - shared_user_db:/app/user_db
+      - ./data/api_user_db:/app/user_db
     ports:
       - "8000:8000"
     restart: always
@@ -429,7 +428,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - grafana_data:/var/lib/grafana
+      - ./data/grafana:/var/lib/grafana
     container_name: grafana
     networks:
       - app
@@ -449,9 +448,7 @@ networks:
 
 volumes:
   mongodb_data:
-  shared_user_db:
   shared_prometheus:
-  grafana_data:
   postgres-db-volume-airflow:
   postgres-db-volume-mlflow:
-  mlflow-data:
+

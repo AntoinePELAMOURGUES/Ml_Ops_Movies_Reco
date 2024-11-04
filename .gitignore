@@ -1,7 +1,6 @@
 /src/data
-/app/mongodb_data
-/app/prometheus
-/app/shared_volume
+/mlflow-data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
