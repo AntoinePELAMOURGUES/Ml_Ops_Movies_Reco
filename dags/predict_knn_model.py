@@ -52,7 +52,7 @@ def run_training(**kwargs):
     """Main function to train the model."""
 
     # Load data
-    ratings = read_ratings('ratings.csv')
+    ratings = read_ratings('processed_ratings.csv')
 
     # Create sparse matrix from ratings
     X = create_X(ratings)

@@ -32,7 +32,7 @@ def train_model() -> tuple:
     # Démarrer un nouveau run dans MLflow
     with mlflow.start_run(run_name=run_name) as run:
         # Charger les données d'évaluation des films
-        ratings = read_ratings('ratings.csv')
+        ratings = read_ratings('processed_ratings.csv')
 
         # Préparer les données pour Surprise
         reader = Reader(rating_scale=(0.5, 5))
