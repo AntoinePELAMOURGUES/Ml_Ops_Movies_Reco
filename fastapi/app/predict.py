@@ -224,9 +224,9 @@ error_counter = Counter(
 # CHARGEMENT DES DONNEES AU DEMARRAGE DE API
 print("DEBUT DES CHARGEMENTS")
 # Chargement de nos dataframe depuis mongo_db
-ratings = read_ratings('ratings.csv')
-movies = read_movies('movies.csv')
-links = read_links('links2.csv')
+ratings = read_ratings('processed_ratings.csv')
+movies = read_movies('processed_movies.csv')
+links = read_links('processed_links.csv')
 
 # Merge de movies et links pour avoir un ix commun
 movies_links_df = movies.merge(links, on = "movieId", how = 'left')
@@ -236,13 +236,9 @@ model_svd = load_model()
 # X, user_mapper, movie_mapper, user_inv_mapper, movie_inv_mapper = create_X(ratings)
 # Création d'une représentation binaire des genres pour chaque film
 genres = set(g for G in movies['genres'] for g in G)
-# Convertir le set en liste
-genre_list = list(genres)
-# Créer un DataFrame vide avec les genres comme colonnes
-genre_columns = pd.DataFrame(0, index=movies.index, columns=genre_list)
-# Remplir le DataFrame avec des 1 là où le genre est présent
+# Création des colonnes pour chaque genre
 for g in genres:
-    genre_columns[g] = movies['genres'].apply(lambda x: int(g in x))
+    movies[g] = movies.genres.transform(lambda x: int(g in x))
 # Préparation d'une matrice contenant uniquement les colonnes de genres, sans ID et titre
 movie_genres = pd.concat([movies.drop(columns=['movieId', 'title', 'genres']), genre_columns], axis=1)
 # Création de dictionnaires pour faciliter l'accès aux titres et aux couvertures des films par leur ID

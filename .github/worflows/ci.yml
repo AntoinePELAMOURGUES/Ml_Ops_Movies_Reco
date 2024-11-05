@@ -1,0 +1,53 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Install dependencies
+        run: |
+          pip install -r fastapi/requirements.txt
+          pip install -r streamlit/requirements.txt
+          pip install -r airflow/requirements.txt
+          pip install pytest pytest-httpx
+
+      - name: Run tests
+        run: |
+          pytest tests/
+          pytest fastapi/app/
+          pytest airflow/
+
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Build Docker images
+        run: |
+          docker build -t myusername/fastapi ./fastapi
+          docker build -t myusername/airflow ./airflow
+          # Ajoutez d'autres constructions si nécessaire
+
+      - name: Push Docker images
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker push myusername/fastapi
+          docker push myusername/airflow

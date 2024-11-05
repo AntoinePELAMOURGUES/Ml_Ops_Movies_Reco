@@ -38,6 +38,9 @@ def preprocessing_ratings(ratings_file) -> pd.DataFrame:
     # Calculer la moyenne bayésienne par film
     movies_stats['bayesian_mean'] = movies_stats.apply(lambda x: bayesienne_mean(df[df['movieId'] == x.name]['rating'], M, C), axis=1)
 
+    # Ajouter la colonne bayesian_mean au DataFrame original
+    df = df.merge(movies_stats[['bayesian_mean']], on='movieId', how='left')
+
     # Remplacer les évaluations originales par les moyennes bayésiennes
     df['rating'] = df['movieId'].apply(lambda x: movies_stats.loc[x, 'bayesian_mean'])
     print("Application de la moyenne Bayesienne sur la colonne rating effectuée")
