@@ -12,7 +12,7 @@ with st.form("user_info_no", clear_on_submit=True):
 
     if submitted_no:
         response = requests.post(
-        "http://fastapi:8000/predict/new_user",
+        "http://fastapi:6060/predict/new_user",
         json={"movie_title": title}
         )
 

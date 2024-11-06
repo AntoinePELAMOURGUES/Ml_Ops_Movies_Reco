@@ -80,7 +80,7 @@ services:
     command: webserver
     container_name: airflow_webserver
     ports:
-      - "8080:8080"
+      - "8081:8080"
     healthcheck:
       test: [ "CMD", "curl", "--fail", "http://localhost:8080/health" ]
       interval: 30s
@@ -338,35 +338,6 @@ services:
     volumes:
       - ./data/model:/data/model
 
-  ### SUPABASE ---------------
-  # supabase:
-  #   image: supabase/supabase-dev:latest
-  #   ports:
-  #     - "6000:6000"
-  #   container_name: supabase
-  #   environment:
-  #     DB_HOST: postgres-supabase
-  #     DB_NAME: postgres
-  #     DB_USER: postgres
-  #     DB_PASSWORD: postgres
-  #     DB_PORT: 5432
-  #     DB_SCHEMA: public
-  #   depends_on:
-  #     - postgres-supabase
-  #   networks:
-  #     - app
-  # # image postgres pour supabase
-  # postgres-supabase:
-  #   image: postgres:13
-  #   container_name: postgres-supabase
-  #   ports:
-  #     - "5432:5432"
-  #   command:
-  #     - "postgres"
-  #     - "-c"
-  #     - "wal_level=logical"
-  #   networks:
-  #     - app
 
   ### FASTAPI --------------------
   fastapi:
@@ -380,7 +351,7 @@ services:
       - ./data/model/:/app/model
       - ./data/api_user_db:/app/user_db
     ports:
-      - "8000:8000"
+      - "6060:8000"
     restart: always
     networks:
       - app

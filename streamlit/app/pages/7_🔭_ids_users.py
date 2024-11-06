@@ -16,7 +16,7 @@ with st.form("user_info", clear_on_submit=True):
     if submitted:
         # Envoyer la requête POST
         response = requests.post(
-        "http://fastapi:8000/predict/identified_user",
+        "http://fastapi:6060/predict/identified_user",
         json={"userId": user_id_input, "movie_title": title}
         )
 

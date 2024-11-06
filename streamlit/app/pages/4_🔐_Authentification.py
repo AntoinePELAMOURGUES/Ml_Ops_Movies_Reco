@@ -27,7 +27,7 @@ with st.form("registration_form", clear_on_submit = True ):
         # Convertir le nom d'utilisateur en minuscules avant l'envoi
         normalized_username = username.lower()
 
-        response = requests.post("http://fastapi:8000/auth/", json= {"username":normalized_username, "password": password})
+        response = requests.post("http://fastapi:6060/auth/", json= {"username":normalized_username, "password": password})
         result = response.json()
         st.session_state.username_reg = ""
         st.session_state.password_reg = ""
@@ -55,7 +55,7 @@ with st.form("connexion_form", clear_on_submit=True):
         # Convertir le nom d'utilisateur en minuscules avant l'envoi
         normalized_username = username.lower()
 
-        response = requests.post("http://fastapi:8000/auth/token", data= {"username":normalized_username, "password": password})
+        response = requests.post("http://fastapi:6060/auth/token", data= {"username":normalized_username, "password": password})
         st.session_state.username_conn = ""
         st.session_state.password_conn = ""
         if response.status_code == 200:  # Utilisateur coonecté
