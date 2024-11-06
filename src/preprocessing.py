@@ -112,6 +112,6 @@ def preprocessing_links(links_file):
 
 
 if __name__ == "__main__":
-    ratings_df = preprocessing_ratings(ratings_file)
+    # ratings_df = preprocessing_ratings(ratings_file)
     movies_df = preprocessing_movies(movies_file)
-    links_df = preprocessing_links(links_file)
+    # links_df = preprocessing_links(links_file)
