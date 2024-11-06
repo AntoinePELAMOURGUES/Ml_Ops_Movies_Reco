@@ -239,13 +239,17 @@ genres = set(g for G in movies['genres'] for g in G)
 # Création des colonnes pour chaque genre
 for g in genres:
     movies[g] = movies.genres.transform(lambda x: int(g in x))
-# Préparation d'une matrice contenant uniquement les colonnes de genres, sans ID et titre
-movie_genres = pd.concat([movies.drop(columns=['movieId', 'title', 'genres']), genre_columns], axis=1)
+# Normalisation de l'année (par exemple, Min-Max)
+movies['year'] = movies['year'].astype(int)
+movies['year_normalized'] = (movies['year'] - movies['year'].min()) / (movies['year'].max() - movies['year'].min())
+# Création d'un DataFrame avec les genres et l'année normalisée
+movie_features = movies.drop(columns=['movieId', 'title', 'genres', 'year', '(no genres listed)'])
+movie_features['year_normalized'] = movies['year_normalized']
 # Création de dictionnaires pour faciliter l'accès aux titres et aux couvertures des films par leur ID
 movie_idx = dict(zip(movies['title'], list(movies.index)))
 cover_idx = dict(zip(movies_links_df['cover_link'], list(movies_links_df.index)))
 # Calcul de la similarité cosinus entre les genres des films
-cosine_sim = cosine_similarity(movie_genres, movie_genres)
+cosine_sim = cosine_similarity(movie_features, movie_features)
 print(f"Dimensions of our genres cosine similarity matrix: {cosine_sim.shape}")
 # Création de dictionnaires pour accéder facilement aux titres et aux couvertures des films par leur ID
 movie_titles = dict(zip(movies['movieId'], movies['title']))

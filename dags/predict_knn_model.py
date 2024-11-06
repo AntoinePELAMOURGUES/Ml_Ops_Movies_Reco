@@ -1,13 +1,10 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
-from pymongo import MongoClient
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from datetime import datetime
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 import os
 import pickle
 
